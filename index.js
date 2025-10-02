@@ -33,12 +33,236 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
       // 防重复
       if (document.getElementById('star-fab')) return;
 
-     // 🌟按钮
+      // --- 注入新的 CSS 样式 ---
+      const css = `
+        #star-fab {
+          position: fixed;
+          font-size: 22px;
+          cursor: grab;
+          z-index: 9999;
+          width: 32px;
+          height: 32px;
+          line-height: 28px;
+          text-align: center;
+          user-select: none;
+        }
+
+        #star-panel {
+          position: fixed;
+          top: 60px;
+          right: 20px;
+          width: 320px;
+          background: #1e1e2e;
+          color: #ccc;
+          border: 1px solid #444;
+          border-radius: 8px;
+          padding: 10px;
+          display: none;
+          z-index: 9998;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+          box-sizing: border-box;
+        }
+
+        .sp-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+          color: #fff;
+        }
+
+        .sp-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 6px;
+          margin-bottom: 10px;
+        }
+
+        .sp-btn {
+          background: #33374d;
+          padding: 6px;
+          border-radius: 6px;
+          cursor: pointer;
+          text-align: center;
+          transition: background-color 0.2s;
+        }
+        .sp-btn:hover {
+          background: #4a4f69;
+        }
+
+        .sp-subpanel {
+          background: #2a2e42;
+          padding: 12px;
+          border-radius: 6px;
+          min-height: 120px;
+          margin-bottom: 10px;
+        }
+
+        .sp-debug {
+          height: 80px;
+          background: #111;
+          border: 1px solid #333;
+          padding: 5px;
+          font-size: 12px;
+          overflow-y: auto;
+          color: #aaa;
+          white-space: pre-wrap;
+          word-break: break-all;
+        }
+
+        .sp-output {
+          margin-top: 8px;
+          background: #111;
+          padding: 8px;
+          min-height: 60px;
+          border: 1px solid #333;
+          border-radius: 4px;
+          color: #fff;
+        }
+
+        #star-panel input[type="text"],
+        #star-panel select,
+        #star-panel textarea {
+          background-color: #2a2a3e;
+          color: #ccc;
+          border: 1px solid #444;
+          padding: 6px 8px;
+          border-radius: 4px;
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        #star-panel button {
+          background-color: #4a4a6a;
+          color: #fff;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+
+        #star-panel button:hover {
+          background-color: #6a6a8a;
+        }
+
+        #star-panel .sp-subpanel h4 {
+          margin-top: 0;
+          margin-bottom: 8px;
+          color: #fff;
+        }
+
+        #star-panel .sp-subpanel p {
+          font-size: 12px;
+          color: #999;
+          margin-top: -4px;
+          margin-bottom: 8px;
+        }
+
+        #sp-regex-list,
+        #sp-tag-filter-list {
+          max-height: 150px;
+          overflow-y: auto;
+          border: 1px solid #333;
+          background: #1a1c29;
+          padding: 8px;
+          border-radius: 6px;
+        }
+
+        #sp-regex-list > div,
+        #sp-tag-filter-list > div {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 0;
+          border-bottom: 1px solid #33374d;
+        }
+
+        #sp-regex-list > div:last-child,
+        #sp-tag-filter-list > div:last-child {
+          border-bottom: none;
+        }
+
+        #sp-regex-list span,
+        #sp-tag-filter-list span {
+           flex: 1;
+           word-break: break-all;
+           color: #ddd;
+           font-size: 14px;
+        }
+
+        #sp-regex-list button,
+        #sp-tag-filter-list button {
+          padding: 2px 6px;
+          font-size: 12px;
+        }
+
+        #star-panel label {
+          color: #ccc;
+          cursor: pointer;
+          user-select: none;
+          vertical-align: middle;
+        }
+
+        #star-panel input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          vertical-align: middle;
+          cursor: pointer;
+          accent-color: #6a6a8a;
+        }
+
+        /* --- 补充的提示词面板样式 --- */
+        .sp-prompt-item {
+            padding: 6px 0;
+            border-bottom: 1px solid #33374d;
+        }
+        .sp-prompt-item:last-child {
+            border-bottom: none;
+        }
+        .sp-prompt-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sp-prompt-row span {
+            flex: 1;
+            word-break: break-all;
+            color: #ddd;
+        }
+        .sp-prompt-row button {
+            padding: 2px 6px;
+            font-size: 12px;
+            background-color: transparent;
+            border: none;
+        }
+        .sp-tags-row {
+            margin-left: 24px;
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .sp-tags-row span {
+            background-color: #4a4f69;
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+      `;
+      const styleElement = document.createElement('style');
+      styleElement.id = 'star-panel-styles';
+      styleElement.innerHTML = css;
+      document.head.appendChild(styleElement);
+
+
+     // 🌟按钮 (移除了大部分内联样式，由 CSS 控制)
     const fab = document.createElement('div');
     fab.id = 'star-fab';
     fab.title = MODULE_NAME;
     fab.innerText = '🌟';
-    fab.style.position = 'fixed';
 
     // 如果有存储位置，用存储的位置；否则默认居中
     const savedTop = localStorage.getItem('starFabTop');
@@ -47,23 +271,11 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
       fab.style.top = savedTop;
       fab.style.right = savedRight;
     } else {
-      const centerTop = (window.innerHeight / 2 - 16) + 'px';   // 32px按钮高度/2=16
-      const centerRight = (window.innerWidth / 2 - 16) + 'px';  // 32px按钮宽度/2=16
+      const centerTop = (window.innerHeight / 2 - 16) + 'px';
+      const centerRight = (window.innerWidth / 2 - 16) + 'px';
       fab.style.top = centerTop;
       fab.style.right = centerRight;
     }
-
-    fab.style.zIndex = '9999';
-    fab.style.cursor = 'grab';
-    fab.style.userSelect = 'none';
-    fab.style.fontSize = '22px';
-    fab.style.lineHeight = '28px';
-    fab.style.width = '32px';
-    fab.style.height = '32px';
-    fab.style.textAlign = 'center';
-    fab.style.borderRadius = '50%';
-    fab.style.background = 'transparent'; // 背景透明
-    fab.style.boxShadow = 'none'; // 去掉阴影
     document.body.appendChild(fab);
 
     // 拖动逻辑
@@ -96,7 +308,7 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
       function onEnd() {
         if (!isDragging) return;
         isDragging = false;
-        fab.style.cursor = 'grab';
+        fab.style.cursor = 'grab'; // 恢复光标
         localStorage.setItem('starFabTop', fab.style.top);
         localStorage.setItem('starFabRight', fab.style.right);
       }
@@ -107,7 +319,7 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
         startY = e.touches ? e.touches[0].clientY : e.clientY;
         startTop = parseInt(fab.style.top, 10);
         startRight = parseInt(fab.style.right, 10);
-        fab.style.cursor = 'grabbing';
+        fab.style.cursor = 'grabbing'; // 改变光标
       }
 
       fab.addEventListener('mousedown', onStart);
@@ -124,7 +336,7 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
       panel.innerHTML = `
         <div class="sp-header">
           <div style="font-weight:600">${MODULE_NAME}</div>
-          <div style="font-size:12px; color:#999">v0.3</div>
+          <div style="font-size:12px; color:#999">v0.4</div>
         </div>
 
         <div class="sp-grid">
@@ -146,21 +358,16 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
         panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
       });
 
-      // 统一的、追加模式的 debugLog 函数
       function debugLog(...args) {
         const dbg = document.getElementById('sp-debug');
         if (!dbg) return;
-
         const newText = args.join(' ');
         if (dbg.innerText.endsWith(newText)) return;
-        
-        dbg.innerText += (dbg.innerText === '[调试面板输出]' || dbg.innerText === '' ? '' : '\n') + newText;
+        dbg.innerText += (dbg.innerText === '[调试面板输出]' || dbg.innerText.startsWith('[日志已清除]') ? '' : '\n') + newText;
         dbg.scrollTop = dbg.scrollHeight;
-
         if (window.DEBUG_STAR_PANEL) console.log(`[${MODULE_NAME}]`, ...args);
       }
       
-      // 清除日志的函数
       function clearDebugLog() {
           const dbg = document.getElementById('sp-debug');
           if (dbg) {
@@ -171,7 +378,6 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
       const content = panel.querySelector('#sp-content-area');
 
      function showApiConfig() {
-        const content = document.getElementById("sp-content-area");
         content.innerHTML = `
             <div class="sp-section">
             <label>API URL: <input type="text" id="api-url-input"></label><br>
@@ -303,7 +509,7 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
             }
 
             const lastFetch = localStorage.getItem("independentApiModelsFetchedAt");
-            if (!force && lastFetch && (Date.now() - parseInt(lastFetch, 10) < 3600000)) { // 1 hour cache
+            if (!force && lastFetch && (Date.now() - parseInt(lastFetch, 10) < 3600000)) { 
                 const ts = new Date(parseInt(lastFetch, 10));
                 document.getElementById("api-status").textContent = `模型已在 ${ts.toLocaleString()} 拉取过`;
                 return;
@@ -347,12 +553,13 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
 
       function showPromptConfig() {
         content.innerHTML = `
-            <div style="padding: 12px; background: #f4f4f4; border-radius: 8px; max-width: 600px; margin: 0 auto;">
-                <textarea rows="3" id="sp-prompt-text" placeholder="输入提示词" style="width: 100%; padding: 8px; border-radius: 4px;"></textarea><br>
-                <div id="sp-prompt-list" style="max-height: 200px; overflow-y: auto; margin-top: 12px; border-top: 1px solid #ccc; padding-top: 6px; color: black;"></div>
-                <input type="text" id="sp-prompt-search" placeholder="按标签搜索" style="width: 70%; padding: 8px; margin-top: 8px; border-radius: 4px;">
-                <button id="sp-prompt-search-btn" style="padding: 8px; margin-left: 8px; border-radius: 4px; background-color: #007bff; color: white;">搜索</button>
-                <button id="save-prompts-btn" style="margin-top: 12px; padding: 8px; width: 100%; background-color: #28a745; color: white; border: none; border-radius: 4px;">保存提示词</button>
+            <div>
+                <textarea rows="3" id="sp-prompt-text" placeholder="输入新提示词..."></textarea><br>
+                <div style="display:flex; gap: 8px; margin-top: 8px;">
+                    <input type="text" id="sp-prompt-search" placeholder="按标签搜索..." style="flex:1;">
+                    <button id="sp-prompt-search-btn">搜索</button>
+                </div>
+                <div id="sp-prompt-list" style="max-height: 200px; overflow-y: auto; margin-top: 12px; border-top: 1px solid #444; padding-top: 6px;"></div>
             </div>
         `;
 
@@ -362,8 +569,15 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
 
         function loadUserPrompts() {
             const raw = localStorage.getItem(PROMPTS_KEY);
-            friendCirclePrompts = raw ? JSON.parse(raw) : [];
-            return friendCirclePrompts;
+            try {
+                friendCirclePrompts = raw ? JSON.parse(raw) : [];
+            } catch {
+                friendCirclePrompts = [];
+            }
+        }
+
+        function saveUserPrompts() {
+            localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
         }
 
         function renderPromptList() {
@@ -383,8 +597,8 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
                 checkbox.type = 'checkbox';
                 checkbox.checked = p.enabled || false;
                 checkbox.addEventListener('change', () => {
-                    friendCirclePrompts[idx].enabled = checkbox.checked;
-                    localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
+                    p.enabled = checkbox.checked;
+                    saveUserPrompts();
                 });
 
                 const span = document.createElement('span');
@@ -395,8 +609,8 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
                 editBtn.addEventListener('click', () => {
                     const newText = prompt('编辑提示词:', p.text);
                     if (newText !== null && newText.trim()) {
-                        friendCirclePrompts[idx].text = newText.trim();
-                        localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
+                        p.text = newText.trim();
+                        saveUserPrompts();
                         renderPromptList();
                     }
                 });
@@ -404,11 +618,13 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
                 const tagBtn = document.createElement('button');
                 tagBtn.textContent = '🏷️';
                 tagBtn.addEventListener('click', () => {
-                    const newTag = prompt('输入标签:');
+                    const newTag = prompt('输入标签 (可多个, 用逗号分隔):');
                     if (newTag && newTag.trim()) {
-                        if (!Array.isArray(friendCirclePrompts[idx].tags)) friendCirclePrompts[idx].tags = [];
-                        friendCirclePrompts[idx].tags.push(newTag.trim());
-                        localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
+                        if (!Array.isArray(p.tags)) p.tags = [];
+                        const newTags = newTag.split(',').map(t => t.trim()).filter(Boolean);
+                        p.tags.push(...newTags);
+                        p.tags = [...new Set(p.tags)]; // 去重
+                        saveUserPrompts();
                         renderPromptList();
                     }
                 });
@@ -418,7 +634,7 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
                 delBtn.addEventListener('click', () => {
                     if (confirm(`确定要删除提示词 "${p.text}" 吗?`)) {
                         friendCirclePrompts.splice(idx, 1);
-                        localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
+                        saveUserPrompts();
                         renderPromptList();
                     }
                 });
@@ -434,8 +650,8 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
                         tagEl.textContent = t;
                         tagEl.title = '点击删除标签';
                         tagEl.addEventListener('click', () => {
-                            friendCirclePrompts[idx].tags.splice(tIdx, 1);
-                            localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
+                            p.tags.splice(tIdx, 1);
+                            saveUserPrompts();
                             renderPromptList();
                         });
                         tagsRow.appendChild(tagEl);
@@ -451,17 +667,11 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
             renderPromptList();
         });
 
-        document.getElementById('save-prompts-btn').addEventListener('click', () => {
-            localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
-            alert('提示词已保存');
-            debugLog('保存用户自定义提示词');
-        });
-
         document.getElementById('sp-prompt-text').addEventListener('blur', (e) => {
             const promptText = e.target.value.trim();
             if (promptText) {
                 friendCirclePrompts.push({ text: promptText, enabled: true, tags: [] });
-                localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
+                saveUserPrompts();
                 e.target.value = '';
                 renderPromptList();
             }
@@ -474,27 +684,27 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
 
     function showChatConfig() {
         content.innerHTML = `
-        <div style="padding:12px; border-radius:8px; max-width:500px; margin:0 auto;">
+        <div>
             <div id="sp-chat-slider-container" style="display:flex; align-items:center; margin-bottom:12px;">
-                <span style="margin-right:10px;">读取聊天条数: </span>
+                <label for="sp-chat-slider" style="margin-right:10px;">读取聊天条数: </label>
                 <input type="range" id="sp-chat-slider" min="0" max="20" value="10" style="flex:1;">
-                <span id="sp-chat-slider-value" style="margin-left:4px;">10</span>
+                <span id="sp-chat-slider-value" style="margin-left:10px; min-width: 20px;">10</span>
             </div>
 
             <div style="margin-bottom:12px;">
                 <h4>正则修剪列表 (不发送)</h4>
                 <div style="display:flex; gap:6px; margin-bottom:6px;">
-                    <input type="text" id="sp-new-regex" placeholder="<example></example>" style="flex:1;">
+                    <input type="text" id="sp-new-regex" placeholder="输入正则表达式...">
                     <button id="sp-add-regex">添加</button>
                 </div>
                 <div id="sp-regex-list"></div>
             </div>
 
-            <div style="margin-bottom:12px;">
+            <div>
                 <h4>标签筛选列表 (仅发送标签内)</h4>
                 <p>如果此列表不为空，则仅发送匹配标签内的内容。</p>
                 <div style="display:flex; gap:6px; margin-bottom:6px;">
-                    <input type="text" id="sp-new-tag-filter" placeholder="<example>" style="flex:1;">
+                    <input type="text" id="sp-new-tag-filter" placeholder="输入标签名, 如 <example>">
                     <button id="sp-add-tag-filter">添加</button>
                 </div>
                 <div id="sp-tag-filter-list"></div>
@@ -516,7 +726,7 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
             getLastMessages();
         });
 
-        function setupListEditor(key, containerId, inputId, buttonId, placeholder) {
+        function setupListEditor(key, containerId, inputId, buttonId) {
             const listContainer = document.getElementById(containerId);
             const addInput = document.getElementById(inputId);
             const addButton = document.getElementById(buttonId);
@@ -626,7 +836,7 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
                 <button id="sp-clear-log-btn" style="padding: 2px 6px; font-size: 12px;">清除日志</button>
             </div>
 
-            <div id="sp-gen-output" class="sp-output" contenteditable="true" style="margin-top:8px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; padding: 8px; border: 1px solid #ccc; border-radius: 6px; background: #111; color: #fff;"></div>  
+            <div id="sp-gen-output" class="sp-output" contenteditable="true"></div>  
         `;
 
         const outputContainer = document.getElementById('sp-gen-output');
@@ -639,7 +849,6 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
             debugLog(`读取世界书状态: ${event.target.checked ? '开启' : '关闭'}`);
         });
         
-        // --- 新增：为清除日志按钮绑定事件 ---
         document.getElementById('sp-clear-log-btn').addEventListener('click', clearDebugLog);
 
         function getWorldbookEntries() {
