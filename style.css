@@ -171,3 +171,24 @@
   padding: 2px 6px;
   font-size: 12px;
 }
+
+
+/* --- NEW: Styles for Generate Panel Switch --- */
+/* 为“读取世界书”开关添加样式 */
+
+#star-panel label {
+  color: #ccc;
+  cursor: pointer;
+  user-select: none;
+  vertical-align: middle;
+}
+
+#star-panel input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  cursor: pointer;
+  
+  /* 使用 accent-color 来匹配深色主题，这是最现代简洁的方式 */
+  accent-color: #6a6a8a;
+}
