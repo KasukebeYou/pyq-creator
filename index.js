@@ -259,8 +259,7 @@ document.body.appendChild(fab);
   });
 
   // 测试连接
- // 测试连接（始终向模型发送 ping 并显示返回）
-document.getElementById("api-test-btn").addEventListener("click", async () => {
+ document.getElementById("api-test-btn").addEventListener("click", async () => {
   const urlRaw = document.getElementById("api-url-input").value || localStorage.getItem("independentApiUrl");
   const key = document.getElementById("api-key-input").value || localStorage.getItem("independentApiKey");
   const model = modelSelect.value || localStorage.getItem("independentApiModel");
@@ -287,11 +286,10 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
 
     if (!res.ok) throw new Error(`chat/completions 返回 ${res.status}`);
 
-    const data = await res.json(); // ✅ 读取返回 JSON
+    const data = await res.json();
     document.getElementById("api-status").textContent = `模型 ${model} 可用（ping 成功）`;
     debugLog("ping 成功", data);
 
-    // 可选：显示模型返回内容的第一条
     if (data.choices && data.choices[0]?.message?.content) {
       console.log("模型返回:", data.choices[0].message.content);
     }
@@ -373,14 +371,12 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
     let friendCirclePrompts = [];
     let promptTagFilter = "";
 
-    // Load user prompts from localStorage
     function loadUserPrompts() {
         const raw = localStorage.getItem(PROMPTS_KEY);
         friendCirclePrompts = raw ? JSON.parse(raw) : [];
         return friendCirclePrompts;
     }
 
-    // Render the prompt list
     function renderPromptList() {
         const container = document.getElementById('sp-prompt-list');
         container.innerHTML = '';
@@ -395,7 +391,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
             div.style.borderBottom = '1px solid #eee';
             div.style.paddingBottom = '6px';
 
-            // First row (checkbox, text, buttons)
             const row = document.createElement('div');
             row.style.display = 'flex';
             row.style.alignItems = 'center';
@@ -469,7 +464,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
 
             div.appendChild(row);
 
-            // Tags row
             if (p.tags && p.tags.length > 0) {
                 const tagsRow = document.createElement('div');
                 tagsRow.style.marginLeft = '20px';
@@ -501,26 +495,23 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
         });
     }
 
-    // Add new prompt
     document.getElementById('sp-prompt-search-btn').addEventListener('click', () => {
         promptTagFilter = document.getElementById('sp-prompt-search').value.trim().toLowerCase();
         renderPromptList();
     });
 
-    // Save prompts
     document.getElementById('save-prompts-btn').addEventListener('click', () => {
         localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
         alert('提示词已保存');
         debugLog('保存用户自定义提示词', friendCirclePrompts);
     });
 
-    // Add prompt
     document.getElementById('sp-prompt-text').addEventListener('blur', () => {
         const promptText = document.getElementById('sp-prompt-text').value.trim();
         if (promptText) {
             friendCirclePrompts.push({ text: promptText, enabled: true, tags: [] });
             localStorage.setItem(PROMPTS_KEY, JSON.stringify(friendCirclePrompts));
-            document.getElementById('sp-prompt-text').value = ''; // Clear the input
+            document.getElementById('sp-prompt-text').value = '';
             renderPromptList();
         }
     });
@@ -532,8 +523,9 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
 
  function showChatConfig() {
     const content = document.getElementById('sp-content-area');
+    // --- FIX: Removed inline background and color styles to allow CSS to take effect ---
     content.innerHTML = `
-    <div style="padding:12px; background:#ffffff; color:#000000; border-radius:8px; max-width:500px; margin:0 auto;">
+    <div style="padding:12px; border-radius:8px; max-width:500px; margin:0 auto;">
         <div id="sp-chat-slider-container" style="display:flex; align-items:center; margin-bottom:12px;">
             <span style="margin-right:10px;">读取聊天条数: </span>
             <input type="range" id="sp-chat-slider" min="0" max="20" value="10" style="flex:1;">
@@ -546,18 +538,17 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
                 <input type="text" id="sp-new-regex" placeholder="<example></example>" style="flex:1;">
                 <button id="sp-add-regex">添加</button>
             </div>
-            <div id="sp-regex-list" style="max-height:150px; overflow-y:auto; border:1px solid #ccc; padding:6px; border-radius:6px;"></div>
+            <div id="sp-regex-list"></div>
         </div>
 
-        <!-- 新增：标签筛选列表 -->
         <div style="margin-bottom:12px;">
             <h4>标签筛选列表 (仅发送标签内)</h4>
-            <p style="font-size:12px; color:#666; margin-top:0; margin-bottom:6px;">如果此列表不为空，则仅发送匹配标签内的内容。</p>
+            <p>如果此列表不为空，则仅发送匹配标签内的内容。</p>
             <div style="display:flex; gap:6px; margin-bottom:6px;">
                 <input type="text" id="sp-new-tag-filter" placeholder="<example>" style="flex:1;">
                 <button id="sp-add-tag-filter">添加</button>
             </div>
-            <div id="sp-tag-filter-list" style="max-height:150px; overflow-y:auto; border:1px solid #ccc; padding:6px; border-radius:6px;"></div>
+            <div id="sp-tag-filter-list"></div>
         </div>
     </div>
     `;
@@ -578,7 +569,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
         fetchAndCountMessages();
     });
 
-    // ---------------- 正则修剪列表相关 (不变) ----------------
     const regexListContainer = document.getElementById('sp-regex-list');
     const addRegexInput = document.getElementById('sp-new-regex');
     const addRegexButton = document.getElementById('sp-add-regex');
@@ -588,12 +578,11 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
         regexListContainer.innerHTML = '';
         list.forEach((item, idx) => {
             const div = document.createElement('div');
-            div.style.display = 'flex'; div.style.alignItems = 'center'; div.style.marginBottom = '4px'; div.style.gap = '4px';
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox'; checkbox.checked = item.enabled;
             checkbox.addEventListener('change', () => { list[idx].enabled = checkbox.checked; localStorage.setItem('friendCircleRegexList', JSON.stringify(list)); });
             const text = document.createElement('span');
-            text.textContent = item.pattern; text.style.flex = '1'; text.style.wordBreak = 'break-all';
+            text.textContent = item.pattern;
             const editBtn = document.createElement('button');
             editBtn.textContent = '编辑';
             editBtn.addEventListener('click', () => { const newVal = prompt('编辑正则', item.pattern); if (newVal !== null) { list[idx].pattern = newVal; localStorage.setItem('friendCircleRegexList', JSON.stringify(list)); loadRegexList(); } });
@@ -617,7 +606,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
 
     loadRegexList();
     
-    // ---------------- 新增：标签筛选列表相关 ----------------
     const tagFilterListContainer = document.getElementById('sp-tag-filter-list');
     const addTagFilterInput = document.getElementById('sp-new-tag-filter');
     const addTagFilterButton = document.getElementById('sp-add-tag-filter');
@@ -627,12 +615,11 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
         tagFilterListContainer.innerHTML = '';
         list.forEach((item, idx) => {
             const div = document.createElement('div');
-            div.style.display = 'flex'; div.style.alignItems = 'center'; div.style.marginBottom = '4px'; div.style.gap = '4px';
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox'; checkbox.checked = item.enabled;
             checkbox.addEventListener('change', () => { list[idx].enabled = checkbox.checked; localStorage.setItem('friendCircleTagFilterList', JSON.stringify(list)); });
             const text = document.createElement('span');
-            text.textContent = item.pattern; text.style.flex = '1'; text.style.wordBreak = 'break-all';
+            text.textContent = item.pattern;
             const editBtn = document.createElement('button');
             editBtn.textContent = '编辑';
             editBtn.addEventListener('click', () => { const newVal = prompt('编辑标签', item.pattern); if (newVal !== null) { list[idx].pattern = newVal; localStorage.setItem('friendCircleTagFilterList', JSON.stringify(list)); loadTagFilterList(); } });
@@ -656,7 +643,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
 
     loadTagFilterList();
 
-
     function renderMessagesForDebug(messages) {
         const debugArea = document.getElementById('sp-debug');
         if (!debugArea) return;
@@ -670,7 +656,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
         });
     }
 
-    // ---------------- 获取聊天条数并调试显示 (已更新逻辑) ----------------
     async function getLastMessages() {
         try {
             const ctx = SillyTavern.getContext();
@@ -705,7 +690,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
             const processedMessages = lastMessages.map(msg => {
                 let text = msg.mes || msg.original_mes || "";
 
-                // 步骤1: 如果标签筛选列表有内容，则只提取标签内的文本
                 if (tagFilterList.length > 0) {
                     const extracts = [];
                     tagFilterList.forEach(tagPattern => {
@@ -720,7 +704,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
                     text = extracts.join('\n');
                 }
 
-                // 步骤2: 对处理后的文本（或原始文本）应用正则修剪
                 regexTrimList.forEach(regex => {
                     text = text.replace(regex, '');
                 });
@@ -755,10 +738,9 @@ function showGenPanel() {
         <button id="sp-gen-inject-swipe">注入swipe</button>  
         <button id="sp-gen-auto">自动化</button>
 
-        <!-- 新增：世界书开关 -->
         <div style="margin-top: 8px; display: flex; align-items: center; justify-content: center;">
             <input type="checkbox" id="sp-gen-toggle-worldbook" style="margin-right: 6px;">
-            <label for="sp-gen-toggle-worldbook" style="cursor:pointer; user-select:none;">读取世界书</label>
+            <label for="sp-gen-toggle-worldbook">读取世界书</label>
         </div>
 
         <div id="sp-gen-output" class="sp-output" contenteditable="true" style="  
@@ -786,23 +768,18 @@ function showGenPanel() {
         console.log('[星标拓展-生成]', ...args);  
     }  
 
-    // ---------- [新增] 世界书开关逻辑 ----------
     const worldbookToggle = document.getElementById('sp-gen-toggle-worldbook');
     const WORLDBOOK_TOGGLE_KEY = 'friendCircleUseWorldbook';
 
-    // 1. 加载开关保存的状态
     const useWorldbook = localStorage.getItem(WORLDBOOK_TOGGLE_KEY) === 'true';
     worldbookToggle.checked = useWorldbook;
 
-    // 2. 监听开关变化并保存
     worldbookToggle.addEventListener('change', (event) => {
         const isChecked = event.target.checked;
-        localStorage.setItem(WORLDBOOK_TOGGLE_KEY, isChecked); // isChecked 会被自动转为 "true" 或 "false"
+        localStorage.setItem(WORLDBOOK_TOGGLE_KEY, isChecked);
         debugLog(`读取世界书状态: ${isChecked ? '开启' : '关闭'}`);
     });
 
-
-    // ---------- 加载用户提示词 ----------  
     function loadUserPrompts() {  
         try {  
             const raw = localStorage.getItem(PROMPTS_KEY);  
@@ -813,7 +790,6 @@ function showGenPanel() {
         }  
     }  
 
-    // ---------- 提取最近聊天 (统一的逻辑) ----------  
     async function getLastMessages() {
         try {
             const ctx = SillyTavern.getContext();
@@ -876,7 +852,6 @@ function showGenPanel() {
         }
     }
 
-    // ---------- 生成朋友圈 ----------  
     async function generateFriendCircle(selectedChat = [], selectedWorldbooks = []) {
         const url = localStorage.getItem('independentApiUrl');
         const key = localStorage.getItem('independentApiKey');
@@ -943,7 +918,6 @@ function showGenPanel() {
         }
     }
 
-   // ---------- 自动化模式 ----------
     let autoMode = false;
     let lastMessageCount = 0;
     let autoObserver = null;
@@ -1001,13 +975,11 @@ function showGenPanel() {
         toggleAutoMode(true);
     }
 
-    // ---------- 按钮绑定 ----------    
     document.getElementById('sp-gen-now').addEventListener('click', async () => {    
         try {    
             const cuttedMessages = JSON.parse(localStorage.getItem('cuttedLastMessages') || '[]');
             const selectedChat = cuttedMessages.length > 0 ? cuttedMessages : ['昨天和小明聊天很开心', '今天完成了一个大项目'];    
             
-            // --- 核心修改：根据开关状态决定是否读取世界书 ---
             let selectedWorldbooks = [];
             if (localStorage.getItem(WORLDBOOK_TOGGLE_KEY) === 'true') {
                 const ctx = SillyTavern.getContext();
@@ -1020,7 +992,6 @@ function showGenPanel() {
             } else {
                 debugLog('已跳过读取世界书 (开关关闭)');
             }
-            // --- 修改结束 ---
 
             await generateFriendCircle(selectedChat, selectedWorldbooks);    
         } catch (e) {    
@@ -1029,7 +1000,6 @@ function showGenPanel() {
         }    
     });
 
-    // ---------- [FIXED] 注入输入框 ----------
     document.getElementById('sp-gen-inject-input').addEventListener('click', () => {
         const texts = outputContainer.textContent.trim();
         if (!texts) {
@@ -1042,9 +1012,8 @@ function showGenPanel() {
         }
 
         inputEl.value = texts;
-        // 触发 input 事件以确保 UI 框架能检测到变化，例如自动调整高度
         inputEl.dispatchEvent(new Event('input', { bubbles: true })); 
-        inputEl.focus(); // 将光标聚焦到输入框
+        inputEl.focus();
         debugLog('内容已注入输入框');
     });
 
