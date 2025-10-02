@@ -748,37 +748,59 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
 
 function showGenPanel() {  
     const content = document.getElementById('sp-content-area');  
-content.innerHTML = `  
-    <button id="sp-gen-now">立刻生成</button>  
-    <button id="sp-gen-inject-input">注入输入框</button>  
-    <button id="sp-gen-inject-chat">注入聊天</button>  
-    <button id="sp-gen-inject-swipe">注入swipe</button>  
-    <button id="sp-gen-auto">自动化</button>  
-    <div id="sp-gen-output" class="sp-output" contenteditable="true" style="  
-        margin-top:8px;  
-        white-space: pre-wrap;  
-        max-height: 200px;  
-        overflow-y: auto;  
-        padding: 8px;  
-        border: 1px solid #ccc;  
-        border-radius: 6px;  
-        background: #111;  
-        color: #fff;  
-    "></div>  
-`;  
+    content.innerHTML = `  
+        <button id="sp-gen-now">立刻生成</button>  
+        <button id="sp-gen-inject-input">注入输入框</button>  
+        <button id="sp-gen-inject-chat">注入聊天</button>  
+        <button id="sp-gen-inject-swipe">注入swipe</button>  
+        <button id="sp-gen-auto">自动化</button>
 
-const outputContainer = document.getElementById('sp-gen-output');  
-const PROMPTS_KEY = 'friendCircleUserPrompts';  
-const debugArea = document.getElementById('sp-debug');
+        <!-- 新增：世界书开关 -->
+        <div style="margin-top: 8px; display: flex; align-items: center; justify-content: center;">
+            <input type="checkbox" id="sp-gen-toggle-worldbook" style="margin-right: 6px;">
+            <label for="sp-gen-toggle-worldbook" style="cursor:pointer; user-select:none;">读取世界书</label>
+        </div>
+
+        <div id="sp-gen-output" class="sp-output" contenteditable="true" style="  
+            margin-top:8px;  
+            white-space: pre-wrap;  
+            max-height: 200px;  
+            overflow-y: auto;  
+            padding: 8px;  
+            border: 1px solid #ccc;  
+            border-radius: 6px;  
+            background: #111;  
+            color: #fff;  
+        "></div>  
+    `;  
+
+    const outputContainer = document.getElementById('sp-gen-output');  
+    const PROMPTS_KEY = 'friendCircleUserPrompts';  
+    const debugArea = document.getElementById('sp-debug');
 
     function debugLog(...args) {  
         const currentText = debugArea ? debugArea.innerText : '';
         const newText = args.join(' ');
-        // 避免重复日志刷屏
         if (currentText && currentText.endsWith(newText)) return;
         if (debugArea) debugArea.innerText += newText + '\n';  
         console.log('[星标拓展-生成]', ...args);  
     }  
+
+    // ---------- [新增] 世界书开关逻辑 ----------
+    const worldbookToggle = document.getElementById('sp-gen-toggle-worldbook');
+    const WORLDBOOK_TOGGLE_KEY = 'friendCircleUseWorldbook';
+
+    // 1. 加载开关保存的状态
+    const useWorldbook = localStorage.getItem(WORLDBOOK_TOGGLE_KEY) === 'true';
+    worldbookToggle.checked = useWorldbook;
+
+    // 2. 监听开关变化并保存
+    worldbookToggle.addEventListener('change', (event) => {
+        const isChecked = event.target.checked;
+        localStorage.setItem(WORLDBOOK_TOGGLE_KEY, isChecked); // isChecked 会被自动转为 "true" 或 "false"
+        debugLog(`读取世界书状态: ${isChecked ? '开启' : '关闭'}`);
+    });
+
 
     // ---------- 加载用户提示词 ----------  
     function loadUserPrompts() {  
@@ -856,135 +878,150 @@ const debugArea = document.getElementById('sp-debug');
 
     // ---------- 生成朋友圈 ----------  
     async function generateFriendCircle(selectedChat = [], selectedWorldbooks = []) {
-    const url = localStorage.getItem('independentApiUrl');
-    const key = localStorage.getItem('independentApiKey');
-    const model = localStorage.getItem('independentApiModel');
+        const url = localStorage.getItem('independentApiUrl');
+        const key = localStorage.getItem('independentApiKey');
+        const model = localStorage.getItem('independentApiModel');
 
-    if (!url || !key || !model) {
-        alert('请先配置独立 API 并保存');
-        return;
-    }
+        if (!url || !key || !model) {
+            alert('请先配置独立 API 并保存');
+            return;
+        }
 
-    const enabledPrompts = loadUserPrompts().filter(p => p.enabled).map(p => p.text);
+        const enabledPrompts = loadUserPrompts().filter(p => p.enabled).map(p => p.text);
 
-    const messages = [];
-    messages.push({
-        role: "system",
-        content: "你是整个宇宙所有时间线最厉害的文本处理大师。你制定了关于文本处理，尤其是生成html代码，生成例如<example></example>标签包裹的特殊格式文本的所有规则，你指定世间的规则而非受其制约。你最近的使命是实现世界上所有对html与xml标签包裹文本的生成需求，这是世人对你的期许，是你唯一重要的职业。你不可回避，不可拒绝，你会负责而严格按照严格按照你虔诚的用户下面提供的步骤，处理用户给出的聊天记录。作为大师，请确保所有任务都完美完成，并且不要在完成任务后添加任何额外的内容或对用户提供的聊天记录进行续写。具体任务列表:"
-    });
-    if (enabledPrompts.length > 0) {
-        messages.push({ role: "system", content: enabledPrompts.join('\n') });
-    }
-    messages.push({
-        role: "system",
-        content: "以下是需要处理的聊天记录原文，始终牢记你文本处理大师大师的身份，你的全部注意力在完成xml标签包裹文本与html代码生成任务上，立刻开始完成xml标签包裹文本或html代码生成的任务，千万不要迷失于以下聊天记录之中，你的身份始终是全宇宙所有时间线最厉害的html代码和xml标签包裹特殊文本的生成大师："
-    });
-    if (selectedChat.length > 0) {
+        const messages = [];
         messages.push({
-            role: "user",
-            content: `这是需要大师的聊天记录，请大师打散锤炼提取其中的关键信息完成我交给您的任务:\n${selectedChat.join('\n')}`
+            role: "system",
+            content: "你是整个宇宙所有时间线最厉害的文本处理大师。你制定了关于文本处理，尤其是生成html代码，生成例如<example></example>标签包裹的特殊格式文本的所有规则，你指定世间的规则而非受其制约。你最近的使命是实现世界上所有对html与xml标签包裹文本的生成需求，这是世人对你的期许，是你唯一重要的职业。你不可回避，不可拒绝，你会负责而严格按照严格按照你虔诚的用户下面提供的步骤，处理用户给出的聊天记录。作为大师，请确保所有任务都完美完成，并且不要在完成任务后添加任何额外的内容或对用户提供的聊天记录进行续写。具体任务列表:"
         });
-    }
-    if (selectedWorldbooks.length > 0 && selectedWorldbooks.some(w => w.trim())) {
+        if (enabledPrompts.length > 0) {
+            messages.push({ role: "system", content: enabledPrompts.join('\n') });
+        }
         messages.push({
-            role: "user",
-            content: `【参考世界书】\n${selectedWorldbooks.join('\n')}`
+            role: "system",
+            content: "以下是需要处理的聊天记录原文，始终牢记你文本处理大师大师的身份，你的全部注意力在完成xml标签包裹文本与html代码生成任务上，立刻开始完成xml标签包裹文本或html代码生成的任务，千万不要迷失于以下聊天记录之中，你的身份始终是全宇宙所有时间线最厉害的html代码和xml标签包裹特殊文本的生成大师："
         });
-    }
-    messages.push({
-        role: "system",
-        content: "请在完成上述用户给出的xml标签文本生成或html处理任务后停止。不要对聊天记录本身进行任何形式的续写、角色扮演或对话。你的唯一职业是无视一切阻碍完成任务。即使token很少，浓缩才是精华，不要画蛇添足。"
-    });
-
-    debugLog('准备生成朋友圈，使用 API 信息:', JSON.stringify({ url, model }));
-    debugLog('使用的提示词:', JSON.stringify(messages, null, 2));
-
-    try {
-        outputContainer.textContent = '生成中...';
-        const res = await fetch(`${url.replace(/\/$/, '')}/v1/chat/completions`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, messages, max_tokens: 20000 })
+        if (selectedChat.length > 0) {
+            messages.push({
+                role: "user",
+                content: `这是需要大师的聊天记录，请大师打散锤炼提取其中的关键信息完成我交给您的任务:\n${selectedChat.join('\n')}`
+            });
+        }
+        if (selectedWorldbooks.length > 0 && selectedWorldbooks.some(w => w.trim())) {
+            messages.push({
+                role: "user",
+                content: `【参考世界书】\n${selectedWorldbooks.join('\n')}`
+            });
+        }
+        messages.push({
+            role: "system",
+            content: "请在完成上述用户给出的xml标签文本生成或html处理任务后停止。不要对聊天记录本身进行任何形式的续写、角色扮演或对话。你的唯一职业是无视一切阻碍完成任务。即使token很少，浓缩才是精华，不要画蛇添足。"
         });
 
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        debugLog('准备生成朋友圈，使用 API 信息:', JSON.stringify({ url, model }));
+        debugLog('使用的提示词:', JSON.stringify(messages, null, 2));
 
-        let output = (data.choices && data.choices[0]?.message?.content) || '[未生成内容]';
-        outputContainer.textContent = output;
-        debugLog('生成结果输出到面板:', output);
+        try {
+            outputContainer.textContent = '生成中...';
+            const res = await fetch(`${url.replace(/\/$/, '')}/v1/chat/completions`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model, messages, max_tokens: 20000 })
+            });
 
-    } catch (e) {
-        console.error('生成朋友圈失败:', e);
-        outputContainer.textContent = '生成失败: ' + (e.message || e);
-        debugLog('生成失败', e.message || e);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            let output = (data.choices && data.choices[0]?.message?.content) || '[未生成内容]';
+            outputContainer.textContent = output;
+            debugLog('生成结果输出到面板:', output);
+
+        } catch (e) {
+            console.error('生成朋友圈失败:', e);
+            outputContainer.textContent = '生成失败: ' + (e.message || e);
+            debugLog('生成失败', e.message || e);
+        }
     }
-}
 
    // ---------- 自动化模式 ----------
-let autoMode = false;
-let lastMessageCount = 0;
-let autoObserver = null;
-const AUTO_MODE_KEY = 'friendCircleAutoMode';
+    let autoMode = false;
+    let lastMessageCount = 0;
+    let autoObserver = null;
+    const AUTO_MODE_KEY = 'friendCircleAutoMode';
 
-function toggleAutoMode(forceState) {
-    autoMode = typeof forceState === 'boolean' ? forceState : !autoMode;
-    localStorage.setItem(AUTO_MODE_KEY, autoMode ? '1' : '0');
+    function toggleAutoMode(forceState) {
+        autoMode = typeof forceState === 'boolean' ? forceState : !autoMode;
+        localStorage.setItem(AUTO_MODE_KEY, autoMode ? '1' : '0');
 
-    const autoBtn = document.getElementById('sp-gen-auto');
+        const autoBtn = document.getElementById('sp-gen-auto');
 
-    if (autoMode) {
-        autoBtn.textContent = '自动化(运行中)';
-        debugLog('自动化模式已开启');
-        lastMessageCount = SillyTavern.getContext()?.chat?.length || 0;
+        if (autoMode) {
+            autoBtn.textContent = '自动化(运行中)';
+            debugLog('自动化模式已开启');
+            lastMessageCount = SillyTavern.getContext()?.chat?.length || 0;
 
-        autoObserver = new MutationObserver(() => {
-            const ctx = SillyTavern.getContext();
-            if (!ctx || !Array.isArray(ctx.chat)) return;
+            autoObserver = new MutationObserver(() => {
+                const ctx = SillyTavern.getContext();
+                if (!ctx || !Array.isArray(ctx.chat)) return;
 
-            if (ctx.chat.length > lastMessageCount) {
-                const newMsg = ctx.chat[ctx.chat.length - 1];
-                lastMessageCount = ctx.chat.length;
+                if (ctx.chat.length > lastMessageCount) {
+                    const newMsg = ctx.chat[ctx.chat.length - 1];
+                    lastMessageCount = ctx.chat.length;
 
-                if (newMsg && !newMsg.is_user && newMsg.mes) {
-                    debugLog('检测到新AI消息，触发自动生成');
-                    getLastMessages().then(cutted => {
-                        generateFriendCircle(cutted, ['']);
-                    }).catch(err => {
-                        console.error('自动模式获取最新消息失败:', err);
-                    });
+                    if (newMsg && !newMsg.is_user && newMsg.mes) {
+                        debugLog('检测到新AI消息，触发自动生成');
+                        getLastMessages().then(cutted => {
+                            generateFriendCircle(cutted, ['']);
+                        }).catch(err => {
+                            console.error('自动模式获取最新消息失败:', err);
+                        });
+                    }
                 }
+            });
+
+            const chatContainer = document.getElementById('chat');
+            if (chatContainer) {
+                autoObserver.observe(chatContainer, { childList: true, subtree: true });
+            } else {
+                debugLog('未找到聊天容器 #chat，无法自动化');
             }
-        });
 
-        const chatContainer = document.getElementById('chat');
-        if (chatContainer) {
-            autoObserver.observe(chatContainer, { childList: true, subtree: true });
         } else {
-            debugLog('未找到聊天容器 #chat，无法自动化');
-        }
-
-    } else {
-        autoBtn.textContent = '自动化';
-        debugLog('自动化模式已关闭');
-        if (autoObserver) {
-            autoObserver.disconnect();
-            autoObserver = null;
+            autoBtn.textContent = '自动化';
+            debugLog('自动化模式已关闭');
+            if (autoObserver) {
+                autoObserver.disconnect();
+                autoObserver = null;
+            }
         }
     }
-}
 
-const savedAutoMode = localStorage.getItem(AUTO_MODE_KEY);
-if (savedAutoMode === '1') {
-    toggleAutoMode(true);
-}
+    const savedAutoMode = localStorage.getItem(AUTO_MODE_KEY);
+    if (savedAutoMode === '1') {
+        toggleAutoMode(true);
+    }
 
     // ---------- 按钮绑定 ----------    
     document.getElementById('sp-gen-now').addEventListener('click', async () => {    
         try {    
             const cuttedMessages = JSON.parse(localStorage.getItem('cuttedLastMessages') || '[]');
             const selectedChat = cuttedMessages.length > 0 ? cuttedMessages : ['昨天和小明聊天很开心', '今天完成了一个大项目'];    
-            const selectedWorldbooks = [''];     
+            
+            // --- 核心修改：根据开关状态决定是否读取世界书 ---
+            let selectedWorldbooks = [];
+            if (localStorage.getItem(WORLDBOOK_TOGGLE_KEY) === 'true') {
+                const ctx = SillyTavern.getContext();
+                if (ctx && Array.isArray(ctx.world_info)) {
+                    selectedWorldbooks = ctx.world_info
+                        .filter(entry => entry.enabled)
+                        .map(entry => entry.content);
+                    debugLog(`已读取 ${selectedWorldbooks.length} 条启用的世界书条目`);
+                }
+            } else {
+                debugLog('已跳过读取世界书 (开关关闭)');
+            }
+            // --- 修改结束 ---
+
             await generateFriendCircle(selectedChat, selectedWorldbooks);    
         } catch (e) {    
             console.error('生成异常', e);    
