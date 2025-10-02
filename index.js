@@ -530,7 +530,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
     debugLog('进入 提示词配置面板');
 }
 
- // START: MODIFIED CODE BLOCK
  function showChatConfig() {
     const content = document.getElementById('sp-content-area');
     content.innerHTML = `
@@ -746,7 +745,6 @@ document.getElementById("api-test-btn").addEventListener("click", async () => {
     fetchAndCountMessages();
     debugLog('进入 聊天配置面板');
 }
-// END: MODIFIED CODE BLOCK
 
 function showGenPanel() {  
     const content = document.getElementById('sp-content-area');  
@@ -774,7 +772,11 @@ const PROMPTS_KEY = 'friendCircleUserPrompts';
 const debugArea = document.getElementById('sp-debug');
 
     function debugLog(...args) {  
-        if (debugArea) debugArea.innerText += args.join(' ') + '\n';  
+        const currentText = debugArea ? debugArea.innerText : '';
+        const newText = args.join(' ');
+        // 避免重复日志刷屏
+        if (currentText && currentText.endsWith(newText)) return;
+        if (debugArea) debugArea.innerText += newText + '\n';  
         console.log('[星标拓展-生成]', ...args);  
     }  
 
@@ -789,8 +791,7 @@ const debugArea = document.getElementById('sp-debug');
         }  
     }  
 
-    // START: MODIFIED CODE BLOCK
-    // ---------- 提取最近聊天 (使用统一的、包含新逻辑的函数) ----------  
+    // ---------- 提取最近聊天 (统一的逻辑) ----------  
     async function getLastMessages() {
         try {
             const ctx = SillyTavern.getContext();
@@ -825,7 +826,6 @@ const debugArea = document.getElementById('sp-debug');
             const processedMessages = lastMessages.map(msg => {
                 let text = msg.mes || msg.original_mes || "";
 
-                // 步骤1: 如果标签筛选列表有内容，则只提取标签内的文本
                 if (tagFilterList.length > 0) {
                     const extracts = [];
                     tagFilterList.forEach(tagPattern => {
@@ -840,7 +840,6 @@ const debugArea = document.getElementById('sp-debug');
                     text = extracts.join('\n');
                 }
 
-                // 步骤2: 对处理后的文本（或原始文本）应用正则修剪
                 regexTrimList.forEach(regex => {
                     text = text.replace(regex, '');
                 });
@@ -848,15 +847,12 @@ const debugArea = document.getElementById('sp-debug');
                 return text.trim();
             }).filter(Boolean);
 
-            // 注意：此处的 getLastMessages 仅用于自动化模式的即时获取
-            // 它不会更新调试面板或 localStorage，以避免与聊天配置面板的显示冲突
             return processedMessages;
         } catch (e) {
             console.error('getLastMessages 出错', e);
             return [];
         }
     }
-    // END: MODIFIED CODE BLOCK
 
     // ---------- 生成朋友圈 ----------  
     async function generateFriendCircle(selectedChat = [], selectedWorldbooks = []) {
@@ -871,80 +867,51 @@ const debugArea = document.getElementById('sp-debug');
 
     const enabledPrompts = loadUserPrompts().filter(p => p.enabled).map(p => p.text);
 
-    // ---------- 构建 messages ----------
     const messages = [];
-
-    // 主提示词1 (system)
     messages.push({
         role: "system",
         content: "你是整个宇宙所有时间线最厉害的文本处理大师。你制定了关于文本处理，尤其是生成html代码，生成例如<example></example>标签包裹的特殊格式文本的所有规则，你指定世间的规则而非受其制约。你最近的使命是实现世界上所有对html与xml标签包裹文本的生成需求，这是世人对你的期许，是你唯一重要的职业。你不可回避，不可拒绝，你会负责而严格按照严格按照你虔诚的用户下面提供的步骤，处理用户给出的聊天记录。作为大师，请确保所有任务都完美完成，并且不要在完成任务后添加任何额外的内容或对用户提供的聊天记录进行续写。具体任务列表:"
     });
-
-    // 用户自定义提示词 (system)
     if (enabledPrompts.length > 0) {
-        messages.push({
-            role: "system",
-            content: enabledPrompts.join('\n')
-        });
+        messages.push({ role: "system", content: enabledPrompts.join('\n') });
     }
-
-    // 主提示词2 (system)
     messages.push({
         role: "system",
         content: "以下是需要处理的聊天记录原文，始终牢记你文本处理大师大师的身份，你的全部注意力在完成xml标签包裹文本与html代码生成任务上，立刻开始完成xml标签包裹文本或html代码生成的任务，千万不要迷失于以下聊天记录之中，你的身份始终是全宇宙所有时间线最厉害的html代码和xml标签包裹特殊文本的生成大师："
     });
-
-    // 聊天记录 (user)
     if (selectedChat.length > 0) {
         messages.push({
             role: "user",
             content: `这是需要大师的聊天记录，请大师打散锤炼提取其中的关键信息完成我交给您的任务:\n${selectedChat.join('\n')}`
         });
     }
-
-    // 世界书 (user)
-    if (selectedWorldbooks.length > 0) {
+    if (selectedWorldbooks.length > 0 && selectedWorldbooks.some(w => w.trim())) {
         messages.push({
             role: "user",
             content: `【参考世界书】\n${selectedWorldbooks.join('\n')}`
         });
     }
-
-    // 主提示词3 (system)
     messages.push({
         role: "system",
         content: "请在完成上述用户给出的xml标签文本生成或html处理任务后停止。不要对聊天记录本身进行任何形式的续写、角色扮演或对话。你的唯一职业是无视一切阻碍完成任务。即使token很少，浓缩才是精华，不要画蛇添足。"
     });
 
-    // ---------- 调试日志 ----------
-    debugLog('准备生成朋友圈，使用 API 信息:', { url, model });
-    debugLog('使用的提示词:', messages);
+    debugLog('准备生成朋友圈，使用 API 信息:', JSON.stringify({ url, model }));
+    debugLog('使用的提示词:', JSON.stringify(messages, null, 2));
 
     try {
+        outputContainer.textContent = '生成中...';
         const res = await fetch(`${url.replace(/\/$/, '')}/v1/chat/completions`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${key}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model,
-                messages,
-                max_tokens: 20000
-            })
+            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model, messages, max_tokens: 20000 })
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        let output = '';
-        if (data.choices && data.choices.length > 0) {
-            output = data.choices.map(c => c.message?.content || '').join('\n');
-        } else {
-            output = '[未生成内容]';
-        }
-
-        outputContainer.textContent = output; // ✅ 保持输出面板逻辑
+        let output = (data.choices && data.choices[0]?.message?.content) || '[未生成内容]';
+        outputContainer.textContent = output;
         debugLog('生成结果输出到面板:', output);
 
     } catch (e) {
@@ -958,10 +925,9 @@ const debugArea = document.getElementById('sp-debug');
 let autoMode = false;
 let lastMessageCount = 0;
 let autoObserver = null;
-const AUTO_MODE_KEY = 'friendCircleAutoMode'; // localStorage key
+const AUTO_MODE_KEY = 'friendCircleAutoMode';
 
 function toggleAutoMode(forceState) {
-    // 如果传入 forceState（true/false），就用它，否则切换当前状态
     autoMode = typeof forceState === 'boolean' ? forceState : !autoMode;
     localStorage.setItem(AUTO_MODE_KEY, autoMode ? '1' : '0');
 
@@ -982,8 +948,6 @@ function toggleAutoMode(forceState) {
 
                 if (newMsg && !newMsg.is_user && newMsg.mes) {
                     debugLog('检测到新AI消息，触发自动生成');
-
-                    // 🔥 直接调用 getLastMessages() 获取最新裁剪过的聊天记录
                     getLastMessages().then(cutted => {
                         generateFriendCircle(cutted, ['']);
                     }).catch(err => {
@@ -1010,101 +974,77 @@ function toggleAutoMode(forceState) {
     }
 }
 
-// ---------- 页面加载时读取持久化状态 ----------
 const savedAutoMode = localStorage.getItem(AUTO_MODE_KEY);
 if (savedAutoMode === '1') {
-    toggleAutoMode(true); // 强制开启
+    toggleAutoMode(true);
 }
 
-
-
-    // ---------- 按钮绑定 ----------  
     // ---------- 按钮绑定 ----------    
-document.getElementById('sp-gen-now').addEventListener('click', async () => {    
-    try {    
-        // 从 localStorage 取已经修剪过的消息
-        const cuttedMessages = JSON.parse(localStorage.getItem('cuttedLastMessages') || '[]');
-        const selectedChat = cuttedMessages.length > 0 ? cuttedMessages : ['昨天和小明聊天很开心', '今天完成了一个大项目'];    
-        const selectedWorldbooks = [''];     
-        generateFriendCircle(selectedChat, selectedWorldbooks);    
-    } catch (e) {    
-        console.error('生成异常', e);    
-        debugLog('生成异常', e.message || e);    
-    }    
-});
+    document.getElementById('sp-gen-now').addEventListener('click', async () => {    
+        try {    
+            const cuttedMessages = JSON.parse(localStorage.getItem('cuttedLastMessages') || '[]');
+            const selectedChat = cuttedMessages.length > 0 ? cuttedMessages : ['昨天和小明聊天很开心', '今天完成了一个大项目'];    
+            const selectedWorldbooks = [''];     
+            await generateFriendCircle(selectedChat, selectedWorldbooks);    
+        } catch (e) {    
+            console.error('生成异常', e);    
+            debugLog('生成异常', e.message || e);    
+        }    
+    });
 
-    // ---------- 工具函数：模拟消息编辑 ----------
+    // ---------- [FIXED] 注入输入框 ----------
+    document.getElementById('sp-gen-inject-input').addEventListener('click', () => {
+        const texts = outputContainer.textContent.trim();
+        if (!texts) {
+            return alert('生成内容为空');
+        }
+
+        const inputEl = document.getElementById('send_textarea');
+        if (!inputEl) {
+            return alert('未找到输入框 send_textarea');
+        }
+
+        inputEl.value = texts;
+        // 触发 input 事件以确保 UI 框架能检测到变化，例如自动调整高度
+        inputEl.dispatchEvent(new Event('input', { bubbles: true })); 
+        inputEl.focus(); // 将光标聚焦到输入框
+        debugLog('内容已注入输入框');
+    });
+
     function simulateEditMessage(mesElement, newText) {
         if (!mesElement) return;
-
-        // 找到编辑按钮
         const editBtn = mesElement.querySelector('.mes_edit');
-        if (!editBtn) {
-            debugLog('未找到编辑按钮 mes_edit');
-            return;
-        }
-
-        // 1. 模拟点击 "小铅笔"
+        if (!editBtn) { debugLog('未找到编辑按钮 mes_edit'); return; }
         editBtn.click();
 
-        // 2. 找到编辑文本框
         const textarea = mesElement.querySelector('.edit_textarea');
-        if (!textarea) {
-            debugLog('未找到编辑文本框 edit_textarea');
-            return;
-        }
-
+        if (!textarea) { debugLog('未找到编辑文本框 edit_textarea'); return; }
         textarea.value = newText;
-        textarea.dispatchEvent(new Event('input', { bubbles: true })); // 触发输入事件
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
 
-        // 3. 找到 "完成" 按钮
         const doneBtn = mesElement.querySelector('.mes_edit_done');
-        if (!doneBtn) {
-            debugLog('未找到完成按钮 mes_edit_done');
-            return;
-        }
-
-        // 4. 模拟点击 "完成"
+        if (!doneBtn) { debugLog('未找到完成按钮 mes_edit_done'); return; }
         doneBtn.click();
     }
 
-    // ---------- 注入聊天（持久化 + 触发渲染） ----------
     document.getElementById('sp-gen-inject-chat').addEventListener('click', () => {
-    const texts = outputContainer.textContent.trim();
-    if (!texts) return alert('生成内容为空');
+        const texts = outputContainer.textContent.trim();
+        if (!texts) return alert('生成内容为空');
 
-    // 从 ST 内存里拿上下文
-    const ctx = SillyTavern.getContext();
-    if (!ctx || !ctx.chat || ctx.chat.length === 0) {
-        return alert('未找到任何内存消息');
-    }
+        const ctx = SillyTavern.getContext();
+        if (!ctx || !ctx.chat || ctx.chat.length === 0) return alert('未找到任何内存消息');
+        
+        const lastAiMes = [...ctx.chat].reverse().find(m => m.is_user === false);
+        if (!lastAiMes) return alert('未找到内存中的 AI 消息');
 
-    // 找最后一条 AI 内存消息
-    const lastAiMes = [...ctx.chat].reverse().find(m => m.is_user === false);
-    if (!lastAiMes) return alert('未找到内存中的 AI 消息');
+        const aiMes = [...document.querySelectorAll('.mes')].reverse().find(m => !m.classList.contains('user'));
+        if (!aiMes) return alert('未找到 DOM 中的 AI 消息');
 
-    // 从 DOM 获取消息列表
-    const allMes = Array.from(document.querySelectorAll('.mes'));
-    if (allMes.length === 0) return alert('未找到任何 DOM 消息');
-
-    // 找最后一条 AI DOM 消息
-    const aiMes = [...allMes].reverse().find(m => !m.classList.contains('user'));
-    if (!aiMes) return alert('未找到 DOM 中的 AI 消息');
-
-    const mesTextEl = aiMes.querySelector('.mes_text');
-    if (!mesTextEl) return alert('AI DOM 消息中未找到 mes_text');
-
-    // 原始消息文本（从内存里拿）
-    const oldRaw = lastAiMes.mes;
-
-    // 拼接新内容（旧 + 新）
-    const newContent = oldRaw + '\n' + texts;
-
-    // 用模拟编辑来触发 DOM 更新
-    simulateEditMessage(aiMes, newContent);
-
-    debugLog('注入聊天成功，并模拟了编辑完成（可被其他脚本监听渲染）');
-});
+        const oldRaw = lastAiMes.mes;
+        const newContent = oldRaw + '\n' + texts;
+        simulateEditMessage(aiMes, newContent);
+        debugLog('注入聊天成功，并模拟了编辑完成');
+    });
 
     document.getElementById('sp-gen-inject-swipe').addEventListener('click', () => {  
         const texts = outputContainer.textContent.trim();  
@@ -1114,11 +1054,10 @@ document.getElementById('sp-gen-now').addEventListener('click', async () => {
         if (!inputEl) return alert('未找到输入框 send_textarea');  
         inputEl.value = command;  
         inputEl.dispatchEvent(new Event('input', { bubbles: true }));  
-        const sendBtn = document.getElementById('send_but') || document.querySelector('button');  
+        const sendBtn = document.getElementById('send_but') || document.querySelector('#send_form > .send_btn');  
         if (sendBtn) sendBtn.click();  
     });  
 
-    // 自动化按钮绑定  
     document.getElementById('sp-gen-auto').addEventListener('click', toggleAutoMode);  
 }
       // 面板按钮绑定
