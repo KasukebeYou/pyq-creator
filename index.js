@@ -53,7 +53,7 @@ if (savedTop && savedRight) {
   fab.style.right = centerRight;
 }
 
-fab.style.zIndex = '99999';
+fab.style.zIndex = '9999';
 fab.style.cursor = 'grab';
 fab.style.userSelect = 'none';
 fab.style.fontSize = '22px';
@@ -780,6 +780,30 @@ function showGenPanel() {
         debugLog(`读取世界书状态: ${isChecked ? '开启' : '关闭'}`);
     });
 
+    // --- 新增：辅助函数，用于获取世界书内容 ---
+    function getWorldbookEntries() {
+        if (localStorage.getItem(WORLDBOOK_TOGGLE_KEY) !== 'true') {
+            debugLog('已跳过读取世界书 (开关关闭)');
+            return [];
+        }
+
+        try {
+            const ctx = SillyTavern.getContext();
+            if (ctx && Array.isArray(ctx.world_info)) {
+                const entries = ctx.world_info
+                    .filter(entry => entry.enabled && entry.content.trim()) // 确保条目启用且内容不为空
+                    .map(entry => entry.content);
+                debugLog(`已读取 ${entries.length} 条启用的世界书条目`);
+                return entries;
+            }
+        } catch (e) {
+            console.error("读取世界书时出错:", e);
+            debugLog("读取世界书时出错:", e.message);
+        }
+        
+        return [];
+    }
+    
     function loadUserPrompts() {  
         try {  
             const raw = localStorage.getItem(PROMPTS_KEY);  
@@ -791,6 +815,7 @@ function showGenPanel() {
     }  
 
     async function getLastMessages() {
+        // ... 此函数内部逻辑保持不变 ...
         try {
             const ctx = SillyTavern.getContext();
             if (!ctx || !Array.isArray(ctx.chat)) return [];
@@ -882,6 +907,7 @@ function showGenPanel() {
                 content: `这是需要大师的聊天记录，请大师打散锤炼提取其中的关键信息完成我交给您的任务:\n${selectedChat.join('\n')}`
             });
         }
+        // --- 逻辑不变，但现在会正确接收到世界书内容 ---
         if (selectedWorldbooks.length > 0 && selectedWorldbooks.some(w => w.trim())) {
             messages.push({
                 role: "user",
@@ -945,7 +971,10 @@ function showGenPanel() {
                     if (newMsg && !newMsg.is_user && newMsg.mes) {
                         debugLog('检测到新AI消息，触发自动生成');
                         getLastMessages().then(cutted => {
-                            generateFriendCircle(cutted, ['']);
+                            // --- 修复：在这里也调用辅助函数来获取世界书 ---
+                            const selectedWorldbooks = getWorldbookEntries();
+                            // --- 修复：传递正确的变量 ---
+                            generateFriendCircle(cutted, selectedWorldbooks);
                         }).catch(err => {
                             console.error('自动模式获取最新消息失败:', err);
                         });
@@ -980,18 +1009,8 @@ function showGenPanel() {
             const cuttedMessages = JSON.parse(localStorage.getItem('cuttedLastMessages') || '[]');
             const selectedChat = cuttedMessages.length > 0 ? cuttedMessages : ['昨天和小明聊天很开心', '今天完成了一个大项目'];    
             
-            let selectedWorldbooks = [];
-            if (localStorage.getItem(WORLDBOOK_TOGGLE_KEY) === 'true') {
-                const ctx = SillyTavern.getContext();
-                if (ctx && Array.isArray(ctx.world_info)) {
-                    selectedWorldbooks = ctx.world_info
-                        .filter(entry => entry.enabled)
-                        .map(entry => entry.content);
-                    debugLog(`已读取 ${selectedWorldbooks.length} 条启用的世界书条目`);
-                }
-            } else {
-                debugLog('已跳过读取世界书 (开关关闭)');
-            }
+            // --- 优化：使用辅助函数替换原来的大段逻辑 ---
+            const selectedWorldbooks = getWorldbookEntries();
 
             await generateFriendCircle(selectedChat, selectedWorldbooks);    
         } catch (e) {    
@@ -1071,7 +1090,7 @@ function showGenPanel() {
         btn.addEventListener('click', () => {
           const key = btn.dataset.key;
           if (key === 'api') showApiConfig();
-          else if (key === 'prompt') showPromptConfig();
+          else if (key === 'prompt') showPromptManger(); // Corrected from showPromptConfig
           else if (key === 'chat') showChatConfig();
           else if (key === 'gen') showGenPanel();
         });
