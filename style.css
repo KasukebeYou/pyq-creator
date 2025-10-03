@@ -9,6 +9,8 @@
   line-height: 28px;
   text-align: center;
   user-select: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 #star-panel {
@@ -37,7 +39,6 @@
 
 .sp-grid {
   display: grid;
-  /* 调整为5列以适应新按钮 */
   grid-template-columns: repeat(5, 1fr); 
   gap: 6px;
   margin-bottom: 10px;
@@ -50,7 +51,7 @@
   cursor: pointer;
   text-align: center;
   transition: background-color 0.2s;
-  font-size: 13px; /* 稍微缩小字体以适应更多按钮 */
+  font-size: 13px;
 }
 .sp-btn:hover {
   background: #4a4f69;
@@ -84,7 +85,7 @@
   border: 1px solid #333;
   border-radius: 4px;
   color: #fff;
-  white-space: pre-wrap; /* 确保生成内容能换行 */
+  white-space: pre-wrap;
   word-break: break-word;
   overflow-y: auto;
   max-height: 200px;
@@ -101,7 +102,7 @@
   border-radius: 4px;
   width: 100%;
   box-sizing: border-box;
-  margin-bottom: 6px; /* 增加一点间距 */
+  margin-bottom: 6px;
 }
 
 #star-panel button {
@@ -118,7 +119,12 @@
   background-color: #6a6a8a;
 }
 
-/* --- CHAT CONFIG & PROMPT LIST STYLES --- */
+.sp-small-btn {
+    padding: 2px 8px !important;
+    font-size: 12px !important;
+}
+
+/* --- LIST STYLES --- */
 #star-panel .sp-subpanel h4 {
   margin-top: 0;
   margin-bottom: 8px;
@@ -189,55 +195,75 @@
   vertical-align: middle;
   cursor: pointer;
   accent-color: #6a6a8a;
+  margin-right: 6px;
 }
 
-/* --- NEW: WORLDBOOK PANEL STYLES --- */
-#sp-worldbook-list-container {
-    max-height: 250px;
-    overflow-y: auto;
-    background: #1a1c29; /* 匹配其他列表背景 */
-    padding: 8px;
-    border-radius: 6px;
-    border: 1px solid #333;
+#star-panel input[type="range"] {
+  width: 100%;
 }
 
-.sp-worldbook-book {
-    margin-bottom: 8px;
-    border-left: 2px solid #555;
-    padding-left: 8px;
+#star-panel hr {
+    border: none;
+    border-top: 1px solid #444;
+    margin: 12px 0;
 }
 
-.sp-worldbook-header {
-    cursor: pointer;
-    font-weight: bold;
-    user-select: none;
-    color: #ddd;
-    padding: 4px 0;
+.sp-small {
+    font-size: 12px;
+    color: #999;
 }
 
-.sp-worldbook-header:hover {
-    color: #fff;
+/* --- NEW: WORLDBOOK & GENERIC UI COMPONENTS --- */
+.sp-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  vertical-align: middle;
+  margin-right: 8px;
 }
+.sp-switch input { display: none; }
+.sp-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #444;
+  transition: .4s;
+}
+.sp-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px; width: 16px;
+  left: 3px; bottom: 3px;
+  background-color: white;
+  transition: .4s;
+}
+input:checked + .sp-slider { background-color: #6a6a8a; }
+input:checked + .sp-slider:before { transform: translateX(18px); }
+.sp-slider.round { border-radius: 22px; }
+.sp-slider.round:before { border-radius: 50%; }
 
-.sp-worldbook-entries {
-    padding-left: 15px;
+.sp-radio-group {
+    display: flex;
+    gap: 15px;
     margin-top: 5px;
 }
 
-.sp-worldbook-entry-label {
-    display: block;
-    margin-bottom: 4px;
-    cursor: pointer;
-    color: #bbb;
+.sp-checkbox-list {
+    max-height: 150px;
+    overflow-y: auto;
+    background: #1a1c29;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    margin-top: 6px;
+}
+
+.sp-checkbox-list > div {
     padding: 4px;
     border-radius: 4px;
     transition: background-color 0.2s;
 }
-
-.sp-worldbook-entry-label:hover {
-    background: #33374d;
-}
-
-.sp-worldbook-entry-label input[type="checkbox"] {
-    margin-right: 8px;
+.sp-checkbox-list > div:hover {
+    background-color: #33374d;
 }
