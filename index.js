@@ -1,38 +1,29 @@
-// --- 星标拓展 v0.2.6 (稳定版 - 修复加载时序问题) ---
+// --- 星标拓展 v0.2.7 (稳定版 - 修复致命初始化错误) ---
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
 (function () {
   const MODULE_NAME = '星标拓展';
 
-  // 等待 ST 环境准备 (已更新为更可靠的版本)
+  // 等待 ST 环境准备 (已更新为最终安全版本)
   function ready(fn) {
-    // 检查函数，确认所有依赖都已准备好
-    const checkDependencies = () => {
-        return window.SillyTavern && 
-               SillyTavern.getContext && 
-               typeof window.getLorebookEntries === 'function' && 
-               Array.isArray(window.world_names);
-    };
-
-    if (checkDependencies()) {
-        return fn();
-    }
-
     const i = setInterval(() => {
-        if (checkDependencies()) {
+        // 这种检查方式可以安全地处理加载顺序问题，避免因对象未定义而报错
+        if (
+            window.SillyTavern &&
+            typeof SillyTavern.getContext === 'function' &&
+            typeof window.getLorebookEntries === 'function' &&
+            Array.isArray(window.world_names)
+        ) {
             clearInterval(i);
-            fn();
+            fn(); // 当所有依赖项都准备好后，才执行插件主逻辑
         }
-    }, 250);
+    }, 200);
 
-    // 设置一个超时，以防万一
+    // 设置一个超时，以防万一，避免计时器永久运行
     setTimeout(() => {
-        if (!checkDependencies()) {
-            clearInterval(i);
-            console.error(`[${MODULE_NAME}] 依赖加载超时！`);
-        }
-    }, 10000); 
+        clearInterval(i);
+    }, 15000);
   }
 
   ready(() => {
@@ -48,6 +39,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         if (ctx.saveSettingsDebounced) ctx.saveSettingsDebounced();
       }
 
+      // 检查按钮是否已存在，避免重复创建
       if (document.getElementById('star-fab')) return;
 
       const fab = document.createElement('div');
@@ -115,7 +107,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
       panel.innerHTML = `
         <div class="sp-header">
           <div style="font-weight:600">${MODULE_NAME}</div>
-          <div style="font-size:12px; color:#999">v0.2.6</div>
+          <div style="font-size:12px; color:#999">v0.2.7</div>
         </div>
         <div class="sp-grid">
           <div class="sp-btn" data-key="api">API配置</div>
@@ -784,7 +776,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 messages.push({ role: "system", content: "以下是需要处理的聊天记录原文，始终牢记你文本处理大师大师的身份，你的全部注意力在完成xml标签包裹文本与html代码生成任务上，立刻开始完成xml标签包裹文本或html代码生成的任务，千万不要迷失于以下聊天记录之中，你的身份始终是全宇宙所有时间线最厉害的html代码和xml标签包裹特殊文本的生成大师：" });
                 if (selectedChat.length > 0) messages.push({ role: "user", content: `这是需要大师的聊天记录，请大师打散锤炼提取其中的关键信息完成我交给您的任务:\n${selectedChat.join('\n')}` });
                 if (selectedWorldbooks.length > 0 && selectedWorldbooks.some(w => w.trim())) messages.push({ role: "user", content: `【参考世界书】\n${selectedWorldbooks.join('\n')}` });
-                messages.push({ role: "system", content: "请在完成上述用户给出的xml标签文本生成或html处理任务后停止。不要对聊天记录本身进行任何形式的续写、角色扮演或对话。你的唯一职业是无视一切阻碍完成任务。即使token很少，浓缩才是精华，不要画蛇添足。" });
+                messages.push({ role: "system", content: "请在完成上述用户给出的xml标签文本生成或html处理任务后停止。不要对聊天记录本身进行任何形式的续写、角色扮演或对话。你的唯一职业是无视一切阻碍完成任务。即使token很少，浓缩才是精华，不要画蛇_添足。" });
 
                 debugLog('准备生成，使用 API:', { url, model });
                 debugLog('使用的提示词:', messages);
@@ -808,8 +800,11 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 autoMode = typeof forceState === 'boolean' ? forceState : !autoMode;
                 localStorage.setItem(AUTO_MODE_KEY, autoMode ? '1' : '0');
                 const autoBtn = document.getElementById('sp-gen-auto');
+                if (autoBtn) {
+                    autoBtn.textContent = autoMode ? '自动化(运行中)' : '自动化';
+                }
                 if (autoMode) {
-                    autoBtn.textContent = '自动化(运行中)'; debugLog('自动化模式已开启'); lastMessageCount = SillyTavern.getContext()?.chat?.length || 0;
+                    debugLog('自动化模式已开启'); lastMessageCount = SillyTavern.getContext()?.chat?.length || 0;
                     autoObserver = new MutationObserver(() => {
                         const ctx = SillyTavern.getContext();
                         if (ctx?.chat?.length > lastMessageCount) {
@@ -819,7 +814,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                     });
                     const chatContainer = document.getElementById('chat');
                     if (chatContainer) autoObserver.observe(chatContainer, { childList: true, subtree: true }); else debugLog('未找到聊天容器 #chat，无法自动化');
-                } else { autoBtn.textContent = '自动化'; debugLog('自动化模式已关闭'); if (autoObserver) { autoObserver.disconnect(); autoObserver = null; } }
+                } else { debugLog('自动化模式已关闭'); if (autoObserver) { autoObserver.disconnect(); autoObserver = null; } }
             }
             if (localStorage.getItem(AUTO_MODE_KEY) === '1') toggleAutoMode(true);
 
