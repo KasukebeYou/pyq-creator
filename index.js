@@ -537,7 +537,8 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
                 let selectedWorldbooks = [];
                 if (localStorage.getItem(WORLDBOOK_TOGGLE_KEY) === 'true') {
                     const ctx = SillyTavern.getContext();
-                    const allLorebookEntries = ctx.worldInfoEntries;
+                    // 直接从 World Info 模块获取所有已加载的条目
+                    const allLorebookEntries = SillyTavern.WI?.entries;
                     if (ctx && Array.isArray(allLorebookEntries)) {
                         const activeBookFiles = [];
                         if (ctx.lorebook_id) activeBookFiles.push(ctx.lorebook_id);
