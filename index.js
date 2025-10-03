@@ -1,47 +1,56 @@
-// --- 星标拓展 v0.2.9 (Final - Corrected based on ST-Amily2 architecture) ---
-import { getContext } from "../../../extensions.js";
-import { saveChat } from "../../../../script.js";
-// REMOVED all other imports to prevent crashing.
+// --- 星标拓展 v0.2.5 (最终稳定版) ---
+import { extension_settings, getContext } from "../../../extensions.js";
+import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
 (function () {
   const MODULE_NAME = '星标拓展';
 
-  // REMOVED the faulty ready() function. The script will now execute immediately and safely.
+  // 等待 ST 环境准备
+  function ready(fn) {
+    if (window.SillyTavern && SillyTavern.getContext) return fn();
+    const i = setInterval(() => {
+      if (window.SillyTavern && SillyTavern.getContext) {
+        clearInterval(i);
+        fn();
+      }
+    }, 200);
+    setTimeout(fn, 5000);
+  }
 
-  try {
-    // This code runs immediately. If it fails, the catch block will log it without crashing the whole UI.
-    const ctx = getContext();
+  ready(() => {
+    try {
+      const ctx = SillyTavern.getContext();
 
-    if (!ctx.extensionSettings[MODULE_NAME]) {
-      ctx.extensionSettings[MODULE_NAME] = {
-        apiConfig: {},
-        prompts: [],
-        chatConfig: { strength: 5, regexList: [] },
-      };
-      if (ctx.saveSettingsDebounced) ctx.saveSettingsDebounced();
-    }
+      if (!ctx.extensionSettings[MODULE_NAME]) {
+        ctx.extensionSettings[MODULE_NAME] = {
+          apiConfig: {},
+          prompts: [],
+          chatConfig: { strength: 5, regexList: [] },
+        };
+        if (ctx.saveSettingsDebounced) ctx.saveSettingsDebounced();
+      }
 
-    if (document.getElementById('star-fab')) return;
+      if (document.getElementById('star-fab')) return;
 
-    const fab = document.createElement('div');
-    fab.id = 'star-fab';
-    fab.title = MODULE_NAME;
-    fab.innerText = '🌟';
+      const fab = document.createElement('div');
+      fab.id = 'star-fab';
+      fab.title = MODULE_NAME;
+      fab.innerText = '🌟';
 
-    const savedTop = localStorage.getItem('starFabTop');
-    const savedRight = localStorage.getItem('starFabRight');
-    if (savedTop && savedRight) {
-      fab.style.top = savedTop;
-      fab.style.right = savedRight;
-    } else {
-      const centerTop = (window.innerHeight / 2 - 16) + 'px';
-      const centerRight = (window.innerWidth / 2 - 16) + 'px';
-      fab.style.top = centerTop;
-      fab.style.right = centerRight;
-    }
-    document.body.appendChild(fab);
+      const savedTop = localStorage.getItem('starFabTop');
+      const savedRight = localStorage.getItem('starFabRight');
+      if (savedTop && savedRight) {
+        fab.style.top = savedTop;
+        fab.style.right = savedRight;
+      } else {
+        const centerTop = (window.innerHeight / 2 - 16) + 'px';
+        const centerRight = (window.innerWidth / 2 - 16) + 'px';
+        fab.style.top = centerTop;
+        fab.style.right = centerRight;
+      }
+      document.body.appendChild(fab);
 
-    (function enableFabDrag() {
+      (function enableFabDrag() {
         let isDragging = false;
         let startX, startY, startTop, startRight;
         function onMove(e) {
@@ -81,58 +90,57 @@ import { saveChat } from "../../../../script.js";
         document.addEventListener('touchmove', onMove, { passive: false });
         document.addEventListener('mouseup', onEnd);
         document.addEventListener('touchend', onEnd);
-    })();
+      })();
 
-    const panel = document.createElement('div');
-    panel.id = 'star-panel';
-    panel.innerHTML = `
-      <div class="sp-header">
-        <div style="font-weight:600">${MODULE_NAME}</div>
-        <div style="font-size:12px; color:#999">v0.2.9</div>
-      </div>
-      <div class="sp-grid">
-        <div class="sp-btn" data-key="api">API配置</div>
-        <div class="sp-btn" data-key="prompt">提示词</div>
-        <div class="sp-btn" data-key="chat">聊天</div>
-        <div class="sp-btn" data-key="worldbook">世界书</div>
-        <div class="sp-btn" data-key="gen">生成</div>
-      </div>
-      <div id="sp-content-area" class="sp-subpanel">
-        <div class="sp-small">请选择一个功能</div>
-      </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-          <span style="font-size: 12px; color: #999;">调试日志</span>
-          <button id="sp-clear-log-btn" style="font-size: 11px; padding: 2px 6px;">清除日志</button>
-      </div>
-      <div id="sp-debug" class="sp-debug"></div>
-    `;
-    document.body.appendChild(panel);
+      const panel = document.createElement('div');
+      panel.id = 'star-panel';
+      panel.innerHTML = `
+        <div class="sp-header">
+          <div style="font-weight:600">${MODULE_NAME}</div>
+          <div style="font-size:12px; color:#999">v0.2.5</div>
+        </div>
+        <div class="sp-grid">
+          <div class="sp-btn" data-key="api">API配置</div>
+          <div class="sp-btn" data-key="prompt">提示词</div>
+          <div class="sp-btn" data-key="chat">聊天</div>
+          <div class="sp-btn" data-key="worldbook">世界书</div>
+          <div class="sp-btn" data-key="gen">生成</div>
+        </div>
+        <div id="sp-content-area" class="sp-subpanel">
+          <div class="sp-small">请选择一个功能</div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <span style="font-size: 12px; color: #999;">调试日志</span>
+            <button id="sp-clear-log-btn" style="font-size: 11px; padding: 2px 6px;">清除日志</button>
+        </div>
+        <div id="sp-debug" class="sp-debug"></div>
+      `;
+      document.body.appendChild(panel);
 
-    document.getElementById('sp-clear-log-btn').addEventListener('click', () => {
-        const dbg = document.getElementById('sp-debug');
-        if (dbg) dbg.textContent = '';
-    });
+      document.getElementById('sp-clear-log-btn').addEventListener('click', () => {
+          const dbg = document.getElementById('sp-debug');
+          if (dbg) dbg.textContent = '';
+      });
 
-    fab.addEventListener('click', () => {
-      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-    });
+      fab.addEventListener('click', () => {
+        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+      });
 
-    function debugLog(...args) {
-        const dbg = document.getElementById('sp-debug');
-        if (!dbg) return;
-        const newText = args.map(arg =>
-            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-        ).join(' ');
-        const timestamp = `[${new Date().toLocaleTimeString()}]`;
-        dbg.textContent += (dbg.textContent ? '\n' : '') + `${timestamp} ${newText}`;
-        dbg.scrollTop = dbg.scrollHeight;
-    }
+      function debugLog(...args) {
+          const dbg = document.getElementById('sp-debug');
+          if (!dbg) return;
+          const newText = args.map(arg =>
+              typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+          ).join(' ');
+          const timestamp = `[${new Date().toLocaleTimeString()}]`;
+          dbg.textContent += (dbg.textContent ? '\n' : '') + `${timestamp} ${newText}`;
+          dbg.scrollTop = dbg.scrollHeight;
+          if (window.DEBUG_STAR_PANEL) console.log(`[${MODULE_NAME}]`, ...args);
+      }
 
-    const content = panel.querySelector('#sp-content-area');
+      const content = panel.querySelector('#sp-content-area');
 
-    function showApiConfig() {
-      // This function code is fine and does not need changes.
-      // ... (code for API config is unchanged)
+      function showApiConfig() {
         content.innerHTML = `
             <div class="sp-section">
             <label>API URL: <input type="text" id="api-url-input"></label><br>
@@ -264,9 +272,8 @@ import { saveChat } from "../../../../script.js";
 
         fetchAndPopulateModels(false);
     }
-    
-    function showPromptConfig() {
-      // ... (code for prompt config is unchanged)
+
+      function showPromptConfig() {
         content.innerHTML = `
             <div style="padding: 12px; background: #2a2e42; border-radius: 8px; max-width: 600px; margin: 0 auto;">
                 <textarea rows="3" id="sp-prompt-text" placeholder="输入提示词" style="width: 100%; padding: 8px; border-radius: 4px;"></textarea><br>
@@ -342,8 +349,7 @@ import { saveChat } from "../../../../script.js";
         loadUserPrompts(); renderPromptList(); debugLog('进入 提示词配置面板');
     }
 
-    function showChatConfig() {
-      // ... (code for chat config is unchanged)
+     function showChatConfig() {
         content.innerHTML = `
         <div style="padding:12px; border-radius:8px; max-width:500px; margin:0 auto;">
             <div id="sp-chat-slider-container" style="display:flex; align-items:center; margin-bottom:12px;"><span style="margin-right:10px;">读取聊天条数: </span><input type="range" id="sp-chat-slider" min="0" max="20" value="10" style="flex:1;"><span id="sp-chat-slider-value" style="margin-left:4px;">10</span></div>
@@ -386,7 +392,7 @@ import { saveChat } from "../../../../script.js";
 
         async function getLastMessages() {
             try {
-                const ctx = getContext();
+                const ctx = SillyTavern.getContext();
                 if (!ctx || !Array.isArray(ctx.chat)) return [];
                 const count = parseInt(localStorage.getItem('friendCircleChatCount') || 10, 10);
                 if (count === 0) return [];
@@ -411,16 +417,12 @@ import { saveChat } from "../../../../script.js";
     }
 
     async function showWorldbookConfig() {
-        // Now, we safely check for the global functions right when we need them.
-        if (typeof getLorebookEntries === 'undefined' || typeof world_names === 'undefined') {
-            content.innerHTML = `<div class="sp-small" style="color:red;">世界书功能模块尚未加载完毕，请稍后再试。</div>`;
-            debugLog('World Book clicked, but dependencies (getLorebookEntries) not ready yet.');
-            return;
-        }
-
         content.innerHTML = `<div class="sp-small">正在加载世界书模块...</div>`;
 
         try {
+            const worldInfoModule = await import('../../../../scripts/world-info.js');
+            const { getLorebookEntries, world_names } = worldInfoModule;
+
             content.innerHTML = `
                 <div class="sp-section" id="worldbook-config-panel">
                     <label class="sp-switch">
@@ -442,11 +444,7 @@ import { saveChat } from "../../../../script.js";
                             <div id="wb-book-list" class="sp-checkbox-list"></div>
                         </div>
                         <hr>
-                        <label><b>选择条目:</b> (勾选需要注入的条目)</label>
-                        <div style="display:flex; gap: 8px; margin-top: 4px; margin-bottom: 8px;">
-                            <button id="wb-entry-select-all" class="sp-small-btn">全选</button>
-                            <button id="wb-entry-select-none" class="sp-small-btn">全不选</button>
-                        </div>
+                        <label><b>选择条目:</b></label>
                         <div id="wb-entry-list" class="sp-checkbox-list"></div>
                         <hr>
                         <div>
@@ -474,8 +472,6 @@ import { saveChat } from "../../../../script.js";
             const entryList = document.getElementById('wb-entry-list');
             const limitSlider = document.getElementById('wb-char-limit-slider');
             const limitValue = document.getElementById('wb-char-limit-value');
-            const selectAllBtn = document.getElementById('wb-entry-select-all');
-            const selectNoneBtn = document.getElementById('wb-entry-select-none');
 
             const settings = {
                 enabled: localStorage.getItem(KEYS.ENABLED) === 'true',
@@ -500,17 +496,17 @@ import { saveChat } from "../../../../script.js";
 
                 if (settings.mode === 'auto') {
                     const ctx = getContext();
-                    if (!ctx.character) {
+                    const character = ctx.characters[ctx.characterId];
+                    if (!character) {
                         entryList.innerHTML = `<div class="sp-small">请先选择一个角色。</div>`;
                         return;
                     }
-                    
+
                     const books = new Set();
-                    if (ctx.worldbook_file_name) {
-                        books.add(ctx.worldbook_file_name);
-                    }
-                    if (Array.isArray(ctx.character.auxiliary_lorebooks)) {
-                        ctx.character.auxiliary_lorebooks.forEach(book => books.add(book));
+                    if (ctx.lorebook_id) books.add(ctx.lorebook_id);
+                    if (character.lorebook) books.add(character.lorebook);
+                    if (Array.isArray(character.auxiliary_lorebooks)) {
+                        character.auxiliary_lorebooks.forEach(book => books.add(book));
                     }
                     targetBookNames = Array.from(books);
                     debugLog('自动模式检测到世界书:', targetBookNames);
@@ -531,9 +527,7 @@ import { saveChat } from "../../../../script.js";
                         const entries = await getLorebookEntries(bookName);
                         if (entries) {
                             entries.forEach(entry => {
-                                if (entry.uid) {
-                                    entriesToShow.push({ ...entry, book: bookName });
-                                }
+                                entriesToShow.push({ ...entry, book: bookName });
                             });
                         }
                     }
@@ -562,7 +556,7 @@ import { saveChat } from "../../../../script.js";
 
                     const label = document.createElement('label');
                     label.htmlFor = checkbox.id;
-                    label.textContent = entry.comment || `(条目: ${entry.keys.slice(0,2).join(', ')}...)`;
+                    label.textContent = entry.comment || entry.title || `(无标题条目: ${entry.keys[0] || '...'})`;
 
                     div.appendChild(checkbox);
                     div.appendChild(label);
@@ -570,9 +564,9 @@ import { saveChat } from "../../../../script.js";
                 });
             };
 
-            const renderBooks = () => {
+            const renderBooks = async () => {
                 bookList.innerHTML = '';
-                const bookNames = world_names || []; 
+                const bookNames = world_names || [];
 
                 if (bookNames.length === 0) {
                     bookList.innerHTML = `<div class="sp-small">未加载任何世界书文件。</div>`;
@@ -601,13 +595,13 @@ import { saveChat } from "../../../../script.js";
                 enabledToggle.checked = settings.enabled;
                 optionsContainer.style.display = settings.enabled ? 'block' : 'none';
                 modeRadios.forEach(radio => radio.checked = radio.value === settings.mode);
-                manualSelectWrapper.style.display = settings.enabled && settings.mode === 'manual' ? 'block' : 'none';
+                manualSelectWrapper.style.display = settings.mode === 'manual' ? 'block' : 'none';
                 limitSlider.value = settings.charLimit;
                 limitValue.textContent = settings.charLimit;
 
                 if (settings.enabled) {
                     if (settings.mode === 'manual') {
-                        renderBooks();
+                        await renderBooks();
                     }
                     await renderEntries();
                 }
@@ -627,9 +621,9 @@ import { saveChat } from "../../../../script.js";
                 }
             }));
 
-            refreshBtn.addEventListener('click', () => {
-                renderBooks();
-                if (window.toastr) toastr.info('世界书列表已刷新');
+            refreshBtn.addEventListener('click', async () => {
+                await renderBooks();
+                toastr.info('世界书列表已刷新');
             });
 
             bookList.addEventListener('change', async (e) => {
@@ -652,26 +646,6 @@ import { saveChat } from "../../../../script.js";
                 }
             });
 
-            selectAllBtn.addEventListener('click', () => {
-                entryList.querySelectorAll('input[type="checkbox"]').forEach(chk => {
-                    if (!chk.checked) {
-                        chk.checked = true;
-                        settings.selectedEntries[chk.dataset.entryId] = true;
-                    }
-                });
-                saveSettings();
-            });
-
-            selectNoneBtn.addEventListener('click', () => {
-                entryList.querySelectorAll('input[type="checkbox"]').forEach(chk => {
-                    if (chk.checked) {
-                        chk.checked = false;
-                        settings.selectedEntries[chk.dataset.entryId] = false;
-                    }
-                });
-                saveSettings();
-            });
-
             limitSlider.addEventListener('input', () => {
                 limitValue.textContent = limitSlider.value;
             });
@@ -691,17 +665,12 @@ import { saveChat } from "../../../../script.js";
     }
 
     async function showGenPanel() {
-        // Now, we safely check for the global functions right when we need them.
-        if (typeof getLorebookEntries === 'undefined') {
-            content.innerHTML = `<div class="sp-small" style="color:red;">世界书功能模块尚未加载完毕，请稍后再试。</div>`;
-            debugLog('Gen Panel clicked, but dependency (getLorebookEntries) not ready yet.');
-            return;
-        }
-        
-        // ... (rest of the gen panel code is unchanged)
         content.innerHTML = `<div class="sp-small">正在加载生成模块...</div>`;
 
         try {
+            const worldInfoModule = await import('../../../../scripts/world-info.js');
+            const { getLorebookEntries } = worldInfoModule;
+
             content.innerHTML = `
                 <button id="sp-gen-now">立刻生成</button>
                 <button id="sp-gen-inject-input">注入输入框</button>
@@ -746,7 +715,7 @@ import { saveChat } from "../../../../script.js";
                         const allEntriesInBook = await getLorebookEntries(bookName);
                         if (allEntriesInBook) {
                             const uidsToGet = booksToFetch[bookName];
-                            const selectedEntriesInBook = allEntriesInBook.filter(entry => entry.uid && uidsToGet.includes(entry.uid));
+                            const selectedEntriesInBook = allEntriesInBook.filter(entry => uidsToGet.includes(entry.uid));
                             combinedContent += selectedEntriesInBook.map(e => e.content).join('\n\n') + '\n\n';
                             entriesCount += selectedEntriesInBook.length;
                         }
@@ -799,13 +768,10 @@ import { saveChat } from "../../../../script.js";
                 autoMode = typeof forceState === 'boolean' ? forceState : !autoMode;
                 localStorage.setItem(AUTO_MODE_KEY, autoMode ? '1' : '0');
                 const autoBtn = document.getElementById('sp-gen-auto');
-                if (autoBtn) {
-                    autoBtn.textContent = autoMode ? '自动化(运行中)' : '自动化';
-                }
                 if (autoMode) {
-                    debugLog('自动化模式已开启'); lastMessageCount = getContext()?.chat?.length || 0;
+                    autoBtn.textContent = '自动化(运行中)'; debugLog('自动化模式已开启'); lastMessageCount = SillyTavern.getContext()?.chat?.length || 0;
                     autoObserver = new MutationObserver(() => {
-                        const ctx = getContext();
+                        const ctx = SillyTavern.getContext();
                         if (ctx?.chat?.length > lastMessageCount) {
                             const newMsg = ctx.chat[ctx.chat.length - 1]; lastMessageCount = ctx.chat.length;
                             if (newMsg && !newMsg.is_user && newMsg.mes) { debugLog('检测到新AI消息，触发自动生成'); getSelectedWorldbookContent().then(wb => generateFriendCircle([], wb)).catch(err => console.error('自动模式获取世界书失败:', err)); }
@@ -813,7 +779,7 @@ import { saveChat } from "../../../../script.js";
                     });
                     const chatContainer = document.getElementById('chat');
                     if (chatContainer) autoObserver.observe(chatContainer, { childList: true, subtree: true }); else debugLog('未找到聊天容器 #chat，无法自动化');
-                } else { debugLog('自动化模式已关闭'); if (autoObserver) { autoObserver.disconnect(); autoObserver = null; } }
+                } else { autoBtn.textContent = '自动化'; debugLog('自动化模式已关闭'); if (autoObserver) { autoObserver.disconnect(); autoObserver = null; } }
             }
             if (localStorage.getItem(AUTO_MODE_KEY) === '1') toggleAutoMode(true);
 
@@ -831,7 +797,7 @@ import { saveChat } from "../../../../script.js";
 
             document.getElementById('sp-gen-inject-input').addEventListener('click', () => { const texts = outputContainer.textContent.trim(); if (!texts) return alert('生成内容为空'); const inputEl = document.getElementById('send_textarea'); if (!inputEl) return alert('未找到输入框 send_textarea'); inputEl.value = texts; inputEl.dispatchEvent(new Event('input', { bubbles: true })); inputEl.focus(); debugLog('内容已注入输入框'); });
             function simulateEditMessage(mesElement, newText) { if (!mesElement) return; const editBtn = mesElement.querySelector('.mes_edit'); if (!editBtn) { debugLog('未找到编辑按钮 mes_edit'); return; } editBtn.click(); const textarea = mesElement.querySelector('.edit_textarea'); if (!textarea) { debugLog('未找到编辑文本框 edit_textarea'); return; } textarea.value = newText; textarea.dispatchEvent(new Event('input', { bubbles: true })); const doneBtn = mesElement.querySelector('.mes_edit_done'); if (!doneBtn) { debugLog('未找到完成按钮 mes_edit_done'); return; } doneBtn.click(); }
-            document.getElementById('sp-gen-inject-chat').addEventListener('click', () => { const texts = outputContainer.textContent.trim(); if (!texts) return alert('生成内容为空'); const ctx = getContext(); if (!ctx || !ctx.chat || ctx.chat.length === 0) return alert('未找到任何内存消息'); const lastAiMes = [...ctx.chat].reverse().find(m => m.is_user === false); if (!lastAiMes) return alert('未找到内存中的 AI 消息'); const aiMes = [...document.querySelectorAll('.mes')].reverse().find(m => !m.classList.contains('user')); if (!aiMes) return alert('未找到 DOM 中的 AI 消息'); const oldRaw = lastAiMes.mes, newContent = oldRaw + '\n' + texts; simulateEditMessage(aiMes, newContent); debugLog('注入聊天成功，并模拟了编辑完成'); });
+            document.getElementById('sp-gen-inject-chat').addEventListener('click', () => { const texts = outputContainer.textContent.trim(); if (!texts) return alert('生成内容为空'); const ctx = SillyTavern.getContext(); if (!ctx || !ctx.chat || ctx.chat.length === 0) return alert('未找到任何内存消息'); const lastAiMes = [...ctx.chat].reverse().find(m => m.is_user === false); if (!lastAiMes) return alert('未找到内存中的 AI 消息'); const aiMes = [...document.querySelectorAll('.mes')].reverse().find(m => !m.classList.contains('user')); if (!aiMes) return alert('未找到 DOM 中的 AI 消息'); const oldRaw = lastAiMes.mes, newContent = oldRaw + '\n' + texts; simulateEditMessage(aiMes, newContent); debugLog('注入聊天成功，并模拟了编辑完成'); });
             document.getElementById('sp-gen-inject-swipe').addEventListener('click', () => { const texts = outputContainer.textContent.trim(); if (!texts) return alert('生成内容为空'); const command = `/addswipe ${texts}`, inputEl = document.getElementById('send_textarea'); if (!inputEl) return alert('未找到输入框 send_textarea'); inputEl.value = command; inputEl.dispatchEvent(new Event('input', { bubbles: true })); const sendBtn = document.getElementById('send_but') || document.querySelector('#send_form > .send_btn'); if (sendBtn) sendBtn.click(); });
             document.getElementById('sp-gen-auto').addEventListener('click', () => toggleAutoMode());
 
@@ -842,24 +808,23 @@ import { saveChat } from "../../../../script.js";
         }
     }
 
-    panel.querySelectorAll('.sp-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const key = btn.dataset.key;
-        content.innerHTML = `<div class="sp-small">正在加载...</div>`;
-        if (key === 'api') showApiConfig();
-        else if (key === 'prompt') showPromptConfig();
-        else if (key === 'chat') showChatConfig();
-        else if (key === 'worldbook') await showWorldbookConfig();
-        else if (key === 'gen') await showGenPanel();
+      panel.querySelectorAll('.sp-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const key = btn.dataset.key;
+          content.innerHTML = `<div class="sp-small">正在加载...</div>`;
+          if (key === 'api') showApiConfig();
+          else if (key === 'prompt') showPromptConfig();
+          else if (key === 'chat') showChatConfig();
+          else if (key === 'worldbook') await showWorldbookConfig();
+          else if (key === 'gen') await showGenPanel();
+        });
       });
-    });
 
-    debugLog('拓展已加载');
-  } catch (err) {
-    console.error(`[${MODULE_NAME}] 初始化失败:`, err);
-    // This makes sure even if something goes wrong, it's logged,
-    // but it won't show the debug panel if the panel itself failed to create.
-    const dbg = document.getElementById('sp-debug');
-    if (dbg) dbg.textContent = `[${MODULE_NAME}] 初始化失败: ${err}`;
-  }
+      debugLog('拓展已加载');
+    } catch (err) {
+      console.error(`[${MODULE_NAME}] 初始化失败:`, err);
+      const dbg = document.getElementById('sp-debug');
+      if (dbg) dbg.textContent = `[${MODULE_NAME}] 初始化失败: ${err}`;
+    }
+  });
 })();
