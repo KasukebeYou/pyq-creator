@@ -537,7 +537,7 @@ import { saveSettingsDebounced,saveChat } from "../../../../script.js";
                 let selectedWorldbooks = [];
                 if (localStorage.getItem(WORLDBOOK_TOGGLE_KEY) === 'true') {
                     const ctx = SillyTavern.getContext();
-                    const allLorebookEntries = SillyTavern.lorebooks?.entries;
+                    const allLorebookEntries = ctx.worldInfoEntries;
                     if (ctx && Array.isArray(allLorebookEntries)) {
                         const activeBookFiles = [];
                         if (ctx.lorebook_id) activeBookFiles.push(ctx.lorebook_id);
