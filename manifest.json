@@ -2,7 +2,8 @@
   "display_name": "自改外置生成器",
   "name":"自改外置生成器",
   "loading_order": 1000,
-  "js": "index.js",
+  "js": "index.js", 
+  "css": "style.css",
   "author": "二改",
   "version": "0.0.3"
 }
