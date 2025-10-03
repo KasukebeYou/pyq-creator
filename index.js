@@ -140,6 +140,30 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
       const content = panel.querySelector('#sp-content-area');
 
+      // [MODIFICATION] Moved getLastMessages to a shared scope to be accessible by both chat and gen panels.
+      async function getLastMessages() {
+          try {
+              const ctx = SillyTavern.getContext();
+              if (!ctx || !Array.isArray(ctx.chat)) return [];
+              const count = parseInt(localStorage.getItem('friendCircleChatCount') || 10, 10);
+              if (count === 0) return [];
+              const lastMessages = ctx.chat.slice(-count);
+              const tagFilterList = JSON.parse(localStorage.getItem('friendCircleTagFilterList') || '[]').filter(item => item.enabled).map(item => item.pattern.trim());
+              const regexTrimList = JSON.parse(localStorage.getItem('friendCircleRegexList') || '[]').filter(r => r.enabled).map(r => { try { const tagMatch = r.pattern.match(/^<(\w+)>.*<\/\1>$/); if (tagMatch) { const tag = tagMatch[1]; return new RegExp(`<${tag}>[\\s\\S]*?<\\/${tag}>`, 'g'); } return new RegExp(r.pattern, 'g'); } catch (e) { console.warn('无效正则:', r.pattern); return null; } }).filter(Boolean);
+              const processedMessages = lastMessages.map(msg => {
+                  let text = msg.mes || msg.original_mes || "";
+                  if (tagFilterList.length > 0) { const extracts = []; tagFilterList.forEach(tagPattern => { const tagName = tagPattern.replace(/[<>/\s]/g, ''); if (!tagName) return; const regex = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, 'g'); let match; while ((match = regex.exec(text)) !== null) { extracts.push(match[1].trim()); } }); text = extracts.join('\n'); }
+                  regexTrimList.forEach(regex => { text = text.replace(regex, ''); });
+                  return text.trim();
+              }).filter(Boolean);
+              
+              // This function now returns the processed messages directly instead of saving to localStorage.
+              const messageContent = processedMessages.map((text, i) => `[${i}] ${text}`).join('\n');
+              debugLog('聊天记录预处理结果:\n' + messageContent);
+              return processedMessages;
+          } catch (e) { console.error('getLastMessages 出错', e); return []; }
+      }
+
       function showApiConfig() {
         content.innerHTML = `
             <div class="sp-section">
@@ -359,7 +383,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         const sliderInput = document.getElementById('sp-chat-slider'), sliderValue = document.getElementById('sp-chat-slider-value');
         const savedCount = localStorage.getItem('friendCircleChatCount');
         if (savedCount) { sliderInput.value = savedCount; sliderValue.textContent = savedCount; }
-        sliderInput.addEventListener('input', () => { sliderValue.textContent = sliderInput.value; localStorage.setItem('friendCircleChatCount', sliderInput.value); debugLog(`已设置读取聊天条数为 ${sliderInput.value}`); fetchAndCountMessages(); });
+        sliderInput.addEventListener('input', () => { sliderValue.textContent = sliderInput.value; localStorage.setItem('friendCircleChatCount', sliderInput.value); debugLog(`已设置读取聊天条数为 ${sliderInput.value}`); getLastMessages(); });
 
         function setupList(containerId, inputId, buttonId, storageKey, type) {
             const container = document.getElementById(containerId), input = document.getElementById(inputId), button = document.getElementById(buttonId);
@@ -390,41 +414,16 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         setupList('sp-regex-list', 'sp-new-regex', 'sp-add-regex', 'friendCircleRegexList', '正则');
         setupList('sp-tag-filter-list', 'sp-new-tag-filter', 'sp-add-tag-filter', 'friendCircleTagFilterList', '标签');
 
-        async function getLastMessages() {
-            try {
-                const ctx = SillyTavern.getContext();
-                if (!ctx || !Array.isArray(ctx.chat)) return [];
-                const count = parseInt(localStorage.getItem('friendCircleChatCount') || 10, 10);
-                if (count === 0) return [];
-                const lastMessages = ctx.chat.slice(-count);
-                const tagFilterList = JSON.parse(localStorage.getItem('friendCircleTagFilterList') || '[]').filter(item => item.enabled).map(item => item.pattern.trim());
-                const regexTrimList = JSON.parse(localStorage.getItem('friendCircleRegexList') || '[]').filter(r => r.enabled).map(r => { try { const tagMatch = r.pattern.match(/^<(\w+)>.*<\/\1>$/); if (tagMatch) { const tag = tagMatch[1]; return new RegExp(`<${tag}>[\\s\\S]*?<\\/${tag}>`, 'g'); } return new RegExp(r.pattern, 'g'); } catch (e) { console.warn('无效正则:', r.pattern); return null; } }).filter(Boolean);
-                const processedMessages = lastMessages.map(msg => {
-                    let text = msg.mes || msg.original_mes || "";
-                    if (tagFilterList.length > 0) { const extracts = []; tagFilterList.forEach(tagPattern => { const tagName = tagPattern.replace(/[<>/\s]/g, ''); if (!tagName) return; const regex = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, 'g'); let match; while ((match = regex.exec(text)) !== null) { extracts.push(match[1].trim()); } }); text = extracts.join('\n'); }
-                    regexTrimList.forEach(regex => { text = text.replace(regex, ''); });
-                    return text.trim();
-                }).filter(Boolean);
-                localStorage.setItem('cuttedLastMessages', JSON.stringify(processedMessages));
-                const messageContent = processedMessages.map((text, i) => `[${i}] ${text}`).join('\n');
-                debugLog('聊天记录预处理结果:\n' + messageContent);
-                return processedMessages;
-            } catch (e) { console.error('getLastMessages 出错', e); return []; }
-        }
-        function fetchAndCountMessages() { getLastMessages(); }
-        fetchAndCountMessages();
+        getLastMessages();
         debugLog('进入 聊天配置面板');
     }
 
-    // ########### REPLACEMENT START: showWorldbookConfig (FIXED) ###########
     async function showWorldbookConfig() {
         content.innerHTML = `<div class="sp-small">正在加载世界书模块...</div>`;
 
         try {
-            // [FIX] 延迟导入，确保ST核心脚本已准备就绪
             const worldInfoModule = await import('../../../../scripts/world-info.js');
             
-            // [FIX] 安全检查，确保模块和必要的函数都存在
             if (!worldInfoModule || typeof worldInfoModule.loadWorldInfo !== 'function') {
                 throw new Error("world-info.js 模块或其API加载失败。");
             }
@@ -500,7 +499,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 entryList.innerHTML = `<div class="sp-small">正在加载条目...</div>`;
                 let targetBookNames = [];
                 
-                // [FIX] 实时、安全地获取 getContext
                 const getContext = SillyTavern.getContext;
                 if (typeof getContext !== 'function') {
                     entryList.innerHTML = `<div class="sp-small" style="color:red;">SillyTavern.getContext() 不可用。</div>`;
@@ -516,7 +514,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                     const character = ctx.characters[ctx.characterId];
                     
                     const books = new Set();
-                    // [FIX] 安全地访问角色数据
                     if (character.data?.extensions?.world) books.add(character.data.extensions.world);
                     if (Array.isArray(character.data?.extensions?.world_additional)) {
                         character.data.extensions.world_additional.forEach(book => books.add(book));
@@ -579,7 +576,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
             const renderBooks = async () => {
                 bookList.innerHTML = '';
-                // [FIX] 实时获取 world_names
                 const bookNames = worldInfoModule.world_names || [];
 
                 if (bookNames.length === 0) {
@@ -677,10 +673,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             console.error('[星标拓展] Worldbook module failed to load:', err);
         }
     }
-    // ########### REPLACEMENT END: showWorldbookConfig (FIXED) ###########
-
-
-    // ########### REPLACEMENT START: showGenPanel ###########
+    
     async function showGenPanel() {
         content.innerHTML = `<div class="sp-small">正在加载生成模块...</div>`;
 
@@ -810,10 +803,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             }
             if (localStorage.getItem(AUTO_MODE_KEY) === '1') toggleAutoMode(true);
 
+            // [MODIFICATION] "Generate Now" button now fetches fresh chat data.
             document.getElementById('sp-gen-now').addEventListener('click', async () => {
                 try {
-                    const cuttedMessages = JSON.parse(localStorage.getItem('cuttedLastMessages') || '[]');
-                    const selectedChat = cuttedMessages.length > 0 ? cuttedMessages : [];
+                    const selectedChat = await getLastMessages(); // Fetches the latest chat messages.
                     const selectedWorldbooks = await getSelectedWorldbookContent();
                     await generateFriendCircle(selectedChat, selectedWorldbooks);
                 } catch (e) {
@@ -834,11 +827,13 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             console.error('[星标拓展] Gen Panel module failed to load:', err);
         }
     }
-    // ########### REPLACEMENT END: showGenPanel ###########
 
 
       panel.querySelectorAll('.sp-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
+          // [MODIFICATION] Clear the debug log every time a tab is switched.
+          document.getElementById('sp-debug').textContent = '';
+          
           const key = btn.dataset.key;
           content.innerHTML = `<div class="sp-small">正在加载...</div>`;
           if (key === 'api') showApiConfig();
