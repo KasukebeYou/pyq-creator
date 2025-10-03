@@ -421,12 +421,11 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         content.innerHTML = `<div class="sp-small">正在加载世界书模块...</div>`;
 
         try {
-            // [修改] 动态导入SillyTavern的核心模块
-            const worldInfoModule = await import('../../../../scripts/world-info.js');
-            // [修改] 解构出我们需要的所有API
-            const { getLorebookEntries, world_names, getContext } = worldInfoModule;
+            // [修正] 不再使用动态导入，直接使用SillyTavern的全局变量和函数
+            if (typeof window.loadWorldInfo !== 'function' || !Array.isArray(window.world_names)) {
+                throw new Error("SillyTavern核心世界书API未准备就绪。");
+            }
 
-            // [新增] 完整的UI HTML结构
             content.innerHTML = `
                 <div class="sp-section" id="worldbook-config-panel">
                     <label class="sp-switch">
@@ -459,7 +458,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 </div>
             `;
 
-            // [新增] 使用localStorage进行设置的读写管理
             const KEYS = {
                 ENABLED: 'star_wb_enabled',
                 MODE: 'star_wb_mode',
@@ -478,7 +476,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             const limitSlider = document.getElementById('wb-char-limit-slider');
             const limitValue = document.getElementById('wb-char-limit-value');
 
-            // [新增] 从localStorage加载设置
             const settings = {
                 enabled: localStorage.getItem(KEYS.ENABLED) === 'true',
                 mode: localStorage.getItem(KEYS.MODE) || 'auto',
@@ -487,7 +484,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 charLimit: parseInt(localStorage.getItem(KEYS.CHAR_LIMIT) || '3000', 10),
             };
 
-            // [新增] 保存设置到localStorage
             const saveSettings = () => {
                 localStorage.setItem(KEYS.ENABLED, settings.enabled);
                 localStorage.setItem(KEYS.MODE, settings.mode);
@@ -497,23 +493,22 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 debugLog('世界书配置已保存', settings);
             };
 
-            // [新增] 渲染可选条目的核心逻辑
             const renderEntries = async () => {
                 entryList.innerHTML = `<div class="sp-small">正在加载条目...</div>`;
                 let targetBookNames = [];
 
                 if (settings.mode === 'auto') {
-                    const ctx = getContext();
+                    const ctx = SillyTavern.getContext();
                     const character = ctx.characters[ctx.characterId];
                     if (!character) {
                         entryList.innerHTML = `<div class="sp-small">请先选择一个角色。</div>`;
                         return;
                     }
-                    // 自动获取角色卡关联的所有世界书
                     const books = new Set();
-                    if (character.data?.extensions?.world) books.add(character.data.extensions.world);
-                    if (Array.isArray(character.data?.extensions?.world_additional)) {
-                        character.data.extensions.world_additional.forEach(book => books.add(book));
+                    // [修正] 使用正确的角色世界书数据路径
+                    if (character.data.world) books.add(character.data.world);
+                    if (Array.isArray(character.data.world_additional)) {
+                        character.data.world_additional.forEach(book => books.add(book));
                     }
                     targetBookNames = Array.from(books);
                     debugLog('自动模式检测到世界书:', targetBookNames);
@@ -531,8 +526,8 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 const entriesToShow = [];
                 try {
                     for (const bookName of targetBookNames) {
-                        // 使用导入的getLorebookEntries获取条目
-                        const bookData = await worldInfoModule.loadWorldInfo(bookName);
+                        // [修正] 直接调用全局的 loadWorldInfo 函数
+                        const bookData = await window.loadWorldInfo(bookName);
                         if (bookData && bookData.entries) {
                             Object.entries(bookData.entries).forEach(([uid, entry]) => {
                                 entriesToShow.push({ ...entry, uid, book: bookName });
@@ -572,10 +567,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 });
             };
 
-            // [新增] 渲染世界书列表
             const renderBooks = async () => {
                 bookList.innerHTML = '';
-                const bookNames = world_names || [];
+                // [修正] 直接使用全局的 world_names 变量
+                const bookNames = window.world_names || [];
 
                 if (bookNames.length === 0) {
                     bookList.innerHTML = `<div class="sp-small">未加载任何世界书文件。</div>`;
@@ -600,7 +595,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 });
             };
             
-            // [新增] 更新整个UI状态
             const updateUI = async () => {
                 enabledToggle.checked = settings.enabled;
                 optionsContainer.style.display = settings.enabled ? 'block' : 'none';
@@ -617,7 +611,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 }
             };
 
-            // [新增] 绑定所有事件
             enabledToggle.addEventListener('change', () => {
                 settings.enabled = enabledToggle.checked;
                 saveSettings();
@@ -633,8 +626,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             }));
 
             refreshBtn.addEventListener('click', async () => {
-                // SillyTavern's world_names might not update automatically
-                // A full reload might be needed for new books, but this can refresh the list UI.
                 await renderBooks();
                 toastr.info('世界书列表已刷新');
             });
@@ -667,7 +658,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 saveSettings();
             });
 
-            // [新增] 初始化UI
             await updateUI();
             debugLog('进入 世界书配置面板');
 
@@ -684,10 +674,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         content.innerHTML = `<div class="sp-small">正在加载生成模块...</div>`;
 
         try {
-            // [修改] 导入不再是必须的，因为我们从localStorage读取
-            // 但为了安全起见，我们保留它，因为getSelectedWorldbookContent需要它
-            const worldInfoModule = await import('../../../../scripts/world-info.js');
-            const { loadWorldInfo } = worldInfoModule;
+            // [修正] 确保我们能访问到全局的 loadWorldInfo
+            if (typeof window.loadWorldInfo !== 'function') {
+                throw new Error("SillyTavern核心世界书API未准备就绪。");
+            }
 
             content.innerHTML = `
                 <button id="sp-gen-now">立刻生成</button>
@@ -702,7 +692,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             const savedOutput = localStorage.getItem(LAST_GEN_OUTPUT_KEY);
             if (savedOutput) outputContainer.textContent = savedOutput;
 
-            // [新增] 核心函数：获取用户选择的世界书条目的文本内容
             async function getSelectedWorldbookContent() {
                 const KEYS = {
                     ENABLED: 'star_wb_enabled',
@@ -731,7 +720,8 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 let entriesCount = 0;
                 for (const bookName in booksToFetch) {
                     try {
-                        const bookData = await loadWorldInfo(bookName);
+                        // [修正] 直接调用全局的 loadWorldInfo
+                        const bookData = await window.loadWorldInfo(bookName);
                         if (bookData && bookData.entries) {
                             const uidsToGet = booksToFetch[bookName];
                             for (const uid of uidsToGet) {
@@ -753,10 +743,9 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 }
 
                 debugLog(`成功读取 ${entriesCount} 条世界书条目，总长度 ${combinedContent.length} 字。`);
-                return [combinedContent].filter(Boolean); // 返回包含一个字符串的数组
+                return [combinedContent].filter(Boolean);
             }
 
-            // [修改] generateFriendCircle 函数现在接收世界书内容作为参数
             async function generateFriendCircle(selectedChat = [], selectedWorldbooks = []) {
                 const url = localStorage.getItem('independentApiUrl'), key = localStorage.getItem('independentApiKey'), model = localStorage.getItem('independentApiModel');
                 if (!url || !key || !model) { alert('请先配置独立 API 并保存'); return; }
@@ -767,7 +756,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 messages.push({ role: "system", content: "以下是需要处理的聊天记录原文，始终牢记你文本处理大师大师的身份，你的全部注意力在完成xml标签包裹文本与html代码生成任务上，立刻开始完成xml标签包裹文本或html代码生成的任务，千万不要迷失于以下聊天记录之中，你的身份始终是全宇宙所有时间线最厉害的html代码和xml标签包裹特殊文本的生成大师：" });
                 if (selectedChat.length > 0) messages.push({ role: "user", content: `这是需要大师的聊天记录，请大师打散锤炼提取其中的关键信息完成我交给您的任务:\n${selectedChat.join('\n')}` });
                 
-                // [修改] 将获取到的世界书内容注入到提示词中
                 if (selectedWorldbooks.length > 0 && selectedWorldbooks.some(w => w.trim())) {
                     messages.push({ role: "user", content: `【参考世界书】\n${selectedWorldbooks.join('\n')}` });
                 }
@@ -804,7 +792,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                             const newMsg = ctx.chat[ctx.chat.length - 1]; lastMessageCount = ctx.chat.length;
                             if (newMsg && !newMsg.is_user && newMsg.mes) { 
                                 debugLog('检测到新AI消息，触发自动生成'); 
-                                // [修改] 自动化模式也需要读取世界书
                                 getSelectedWorldbookContent().then(wb => generateFriendCircle([], wb)).catch(err => console.error('自动模式获取世界书失败:', err)); 
                             }
                         }
@@ -815,12 +802,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             }
             if (localStorage.getItem(AUTO_MODE_KEY) === '1') toggleAutoMode(true);
 
-            // [修改] "立刻生成" 按钮的点击事件
             document.getElementById('sp-gen-now').addEventListener('click', async () => {
                 try {
                     const cuttedMessages = JSON.parse(localStorage.getItem('cuttedLastMessages') || '[]');
                     const selectedChat = cuttedMessages.length > 0 ? cuttedMessages : [];
-                    // [修改] 在生成前获取世界书内容
                     const selectedWorldbooks = await getSelectedWorldbookContent();
                     await generateFriendCircle(selectedChat, selectedWorldbooks);
                 } catch (e) {
