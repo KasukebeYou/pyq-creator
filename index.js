@@ -421,7 +421,8 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         content.innerHTML = `<div class="sp-small">正在加载世界书模块...</div>`;
 
         try {
-            const worldInfoModule = await import('../../../../scripts/world-info.js');
+            // ### FIX: Use absolute path for import ###
+            const worldInfoModule = await import('/scripts/world-info.js');
             const { getLorebookEntries, world_names, getContext } = worldInfoModule;
 
             content.innerHTML = `
@@ -506,16 +507,11 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                     const books = new Set();
 
                     // ### START: Robust book detection logic ###
-                    // 1. From the main context (often the primary book)
                     if (ctx.lorebook_id) books.add(ctx.lorebook_id);
-
-                    // 2. From older direct character properties
                     if (character.lorebook) books.add(character.lorebook);
                     if (Array.isArray(character.auxiliary_lorebooks)) {
                         character.auxiliary_lorebooks.forEach(book => book && books.add(book));
                     }
-
-                    // 3. From newer extension-based character properties
                     if (character.data?.extensions?.world) books.add(character.data.extensions.world);
                     if (Array.isArray(character.data?.extensions?.world_additional)) {
                         character.data.extensions.world_additional.forEach(book => book && books.add(book));
@@ -538,7 +534,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 const entriesToShow = [];
                 // ### START: Resilient book loading loop ###
                 for (const bookName of targetBookNames) {
-                    if (!bookName) continue; // Skip if bookName is null or undefined
+                    if (!bookName) continue;
                     try {
                         debugLog(`正在加载世界书: ${bookName}`);
                         const bookData = await worldInfoModule.loadWorldInfo(bookName);
@@ -551,7 +547,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                         }
                     } catch (error) {
                         debugLog(`加载世界书 ${bookName} 时出错:`, error);
-                        // Do not stop the whole process, just log and continue
                     }
                 }
                 // ### END: Resilient book loading loop ###
@@ -689,7 +684,8 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         content.innerHTML = `<div class="sp-small">正在加载生成模块...</div>`;
 
         try {
-            const worldInfoModule = await import('../../../../scripts/world-info.js');
+            // ### FIX: Use absolute path for import ###
+            const worldInfoModule = await import('/scripts/world-info.js');
             const { loadWorldInfo } = worldInfoModule;
 
             content.innerHTML = `
