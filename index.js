@@ -512,13 +512,13 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                     // 2. From older direct character properties
                     if (character.lorebook) books.add(character.lorebook);
                     if (Array.isArray(character.auxiliary_lorebooks)) {
-                        character.auxiliary_lorebooks.forEach(book => books.add(book));
+                        character.auxiliary_lorebooks.forEach(book => book && books.add(book));
                     }
 
                     // 3. From newer extension-based character properties
                     if (character.data?.extensions?.world) books.add(character.data.extensions.world);
                     if (Array.isArray(character.data?.extensions?.world_additional)) {
-                        character.data.extensions.world_additional.forEach(book => books.add(book));
+                        character.data.extensions.world_additional.forEach(book => book && books.add(book));
                     }
                     // ### END: Robust book detection logic ###
 
@@ -536,20 +536,25 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 }
 
                 const entriesToShow = [];
-                try {
-                    for (const bookName of targetBookNames) {
+                // ### START: Resilient book loading loop ###
+                for (const bookName of targetBookNames) {
+                    if (!bookName) continue; // Skip if bookName is null or undefined
+                    try {
+                        debugLog(`正在加载世界书: ${bookName}`);
                         const bookData = await worldInfoModule.loadWorldInfo(bookName);
                         if (bookData && bookData.entries) {
                             Object.entries(bookData.entries).forEach(([uid, entry]) => {
                                 entriesToShow.push({ ...entry, uid, book: bookName });
                             });
+                        } else {
+                            debugLog(`世界书 ${bookName} 已加载，但无条目或格式不正确。`);
                         }
+                    } catch (error) {
+                        debugLog(`加载世界书 ${bookName} 时出错:`, error);
+                        // Do not stop the whole process, just log and continue
                     }
-                } catch (error) {
-                    debugLog('获取世界书条目时出错', error);
-                    entryList.innerHTML = `<div class="sp-small" style="color:red;">加载条目时出错。</div>`;
-                    return;
                 }
+                // ### END: Resilient book loading loop ###
 
                 debugLog(`共找到 ${entriesToShow.length} 个待显示的条目。`);
                 entryList.innerHTML = '';
