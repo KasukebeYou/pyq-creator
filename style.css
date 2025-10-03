@@ -1,8 +1,8 @@
 #star-fab {
   position: fixed;
-  /* 移除了 top 和 right 的固定值，让 JS 的拖拽和保存逻辑完全控制位置 */
+  /* top 和 right 由 JS 控制 */
   font-size: 22px;
-  cursor: grab; /* 初始状态为可抓取 */
+  cursor: grab;
   z-index: 9999;
   width: 32px;
   height: 32px;
@@ -17,12 +17,12 @@
   right: 20px;
   width: 320px;
   background: #1e1e2e;
-  color: #ccc; /* 调整了默认文字颜色，更适合深色背景 */
+  color: #ccc;
   border: 1px solid #444;
   border-radius: 8px;
   padding: 10px;
   display: none;
-  z-index: 9998; /* 比 fab 低一级，避免遮挡 */
+  z-index: 9998;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   box-sizing: border-box;
 }
@@ -32,30 +32,32 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
-  color: #fff; /* 头部文字更亮 */
+  color: #fff;
 }
 
 .sp-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* 调整为5列以适应新按钮 */
+  grid-template-columns: repeat(5, 1fr); 
   gap: 6px;
   margin-bottom: 10px;
 }
 
 .sp-btn {
-  background: #33374d; /* 调整了颜色，更匹配主题 */
+  background: #33374d;
   padding: 6px;
   border-radius: 6px;
   cursor: pointer;
   text-align: center;
   transition: background-color 0.2s;
+  font-size: 13px; /* 稍微缩小字体以适应更多按钮 */
 }
 .sp-btn:hover {
   background: #4a4f69;
 }
 
 .sp-subpanel {
-  background: #2a2e42; /* 调整了颜色，更匹配主题 */
+  background: #2a2e42;
   padding: 12px;
   border-radius: 6px;
   min-height: 120px;
@@ -82,12 +84,13 @@
   border: 1px solid #333;
   border-radius: 4px;
   color: #fff;
+  white-space: pre-wrap; /* 确保生成内容能换行 */
+  word-break: break-word;
+  overflow-y: auto;
+  max-height: 200px;
 }
 
-
-/* --- NEW & UPDATED: Styles for Form Elements inside the Panel --- */
-/* 统一面板内所有表单元素的深色主题样式 */
-
+/* --- FORM ELEMENT STYLES --- */
 #star-panel input[type="text"],
 #star-panel select,
 #star-panel textarea {
@@ -98,6 +101,7 @@
   border-radius: 4px;
   width: 100%;
   box-sizing: border-box;
+  margin-bottom: 6px; /* 增加一点间距 */
 }
 
 #star-panel button {
@@ -114,8 +118,7 @@
   background-color: #6a6a8a;
 }
 
-/* --- NEW & UPDATED: Styles for Chat Config Subpanel --- */
-
+/* --- CHAT CONFIG & PROMPT LIST STYLES --- */
 #star-panel .sp-subpanel h4 {
   margin-top: 0;
   margin-bottom: 8px;
@@ -129,9 +132,9 @@
   margin-bottom: 8px;
 }
 
-/* 统一样式：应用到旧的正则列表和新的标签筛选列表 */
 #sp-regex-list,
-#sp-tag-filter-list {
+#sp-tag-filter-list,
+#sp-prompt-list {
   max-height: 150px;
   overflow-y: auto;
   border: 1px solid #333;
@@ -140,9 +143,9 @@
   border-radius: 6px;
 }
 
-/* 统一样式：列表中的每一项 */
 #sp-regex-list > div,
-#sp-tag-filter-list > div {
+#sp-tag-filter-list > div,
+#sp-prompt-list > div {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -150,32 +153,29 @@
   border-bottom: 1px solid #33374d;
 }
 
-/* 移除最后一项的下边框 */
 #sp-regex-list > div:last-child,
-#sp-tag-filter-list > div:last-child {
+#sp-tag-filter-list > div:last-child,
+#sp-prompt-list > div:last-child {
   border-bottom: none;
 }
 
-/* 统一样式：列表项中的文本 */
 #sp-regex-list span,
-#sp-tag-filter-list span {
+#sp-tag-filter-list span,
+#sp-prompt-list span {
    flex: 1;
    word-break: break-all;
    color: #ddd;
    font-size: 14px;
 }
 
-/* 统一样式：列表项中的小按钮 */
 #sp-regex-list button,
-#sp-tag-filter-list button {
+#sp-tag-filter-list button,
+#sp-prompt-list button {
   padding: 2px 6px;
   font-size: 12px;
 }
 
-
-/* --- NEW: Styles for Generate Panel Switch --- */
-/* 为“读取世界书”开关添加样式 */
-
+/* --- GENERAL UI STYLES --- */
 #star-panel label {
   color: #ccc;
   cursor: pointer;
@@ -188,7 +188,56 @@
   height: 16px;
   vertical-align: middle;
   cursor: pointer;
-  
-  /* 使用 accent-color 来匹配深色主题，这是最现代简洁的方式 */
   accent-color: #6a6a8a;
+}
+
+/* --- NEW: WORLDBOOK PANEL STYLES --- */
+#sp-worldbook-list-container {
+    max-height: 250px;
+    overflow-y: auto;
+    background: #1a1c29; /* 匹配其他列表背景 */
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #333;
+}
+
+.sp-worldbook-book {
+    margin-bottom: 8px;
+    border-left: 2px solid #555;
+    padding-left: 8px;
+}
+
+.sp-worldbook-header {
+    cursor: pointer;
+    font-weight: bold;
+    user-select: none;
+    color: #ddd;
+    padding: 4px 0;
+}
+
+.sp-worldbook-header:hover {
+    color: #fff;
+}
+
+.sp-worldbook-entries {
+    padding-left: 15px;
+    margin-top: 5px;
+}
+
+.sp-worldbook-entry-label {
+    display: block;
+    margin-bottom: 4px;
+    cursor: pointer;
+    color: #bbb;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.sp-worldbook-entry-label:hover {
+    background: #33374d;
+}
+
+.sp-worldbook-entry-label input[type="checkbox"] {
+    margin-right: 8px;
 }
