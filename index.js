@@ -1,6 +1,8 @@
-// --- 星标拓展 v0.2.1 (完整整合版) ---
+// --- 星标拓展 v0.2.2 (Worldbook 修复版) ---
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, saveChat } from "../../../../script.js";
+// [MODIFIED] 引入新的SillyTavern世界书API
+import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../../../scripts/world-info.js";
 
 (function () {
   const MODULE_NAME = '星标拓展';
@@ -97,7 +99,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
       panel.innerHTML = `
         <div class="sp-header">
           <div style="font-weight:600">${MODULE_NAME}</div>
-          <div style="font-size:12px; color:#999">v0.2.1</div>
+          <div style="font-size:12px; color:#999">v0.2.2</div>
         </div>
         <div class="sp-grid">
           <div class="sp-btn" data-key="api">API配置</div>
@@ -137,7 +139,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
           dbg.scrollTop = dbg.scrollHeight;
           if (window.DEBUG_STAR_PANEL) console.log(`[${MODULE_NAME}]`, ...args);
       }
-      
+
       const content = panel.querySelector('#sp-content-area');
 
       function showApiConfig() {
@@ -416,6 +418,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         debugLog('进入 聊天配置面板');
     }
 
+    // [MODIFIED] 整块函数替换
     function showWorldbookConfig() {
         content.innerHTML = `
             <div class="sp-section" id="worldbook-config-panel">
@@ -448,7 +451,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 </div>
             </div>
         `;
-        
+
         const KEYS = {
             ENABLED: 'star_wb_enabled',
             MODE: 'star_wb_mode',
@@ -484,29 +487,62 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             debugLog('世界书配置已保存', settings);
         };
 
-        const getAllWorldbookEntries = () => {
-            if (SillyTavern.worldInfo && typeof SillyTavern.worldInfo.getEntries === 'function') {
-                return SillyTavern.worldInfo.getEntries();
+        // [NEW] 使用新的异步API获取所有世界书条目
+        const getAllWorldbookEntries = async () => {
+            try {
+                if (!Array.isArray(world_names) || world_names.length === 0) {
+                    debugLog('警告: SillyTavern中未找到任何世界书 (world_names 为空)。');
+                    return [];
+                }
+                const allEntries = [];
+                for (const bookName of world_names) {
+                    // 使用官方异步函数获取条目
+                    const entries = await getLorebookEntries(bookName);
+                    if (entries) {
+                        entries.forEach(entry => {
+                            // 将书名附加到每个条目上，方便后续使用
+                            allEntries.push({ ...entry, book: bookName });
+                        });
+                    }
+                }
+                debugLog(`成功从 ${world_names.length} 个世界书中加载了 ${allEntries.length} 个条目。`);
+                return allEntries;
+            } catch (error) {
+                debugLog('错误: 获取世界书条目时发生异常', error);
+                console.error('[星标拓展] getAllWorldbookEntries error:', error);
+                return [];
             }
-            debugLog('警告: 无法通过 SillyTavern.worldInfo.getEntries() 获取世界书');
-            return [];
         };
 
-        const renderEntries = () => {
-            const allEntries = getAllWorldbookEntries();
-            entryList.innerHTML = '';
+        // [MODIFIED] 渲染条目的函数改为异步
+        const renderEntries = async () => {
+            entryList.innerHTML = `<div class="sp-small">正在加载条目...</div>`;
+            const allEntries = await getAllWorldbookEntries();
             let targetBookNames = [];
-            
+
             if (settings.mode === 'auto') {
                 const ctx = getContext();
-                if (ctx.lorebook_id) targetBookNames.push(ctx.lorebook_id);
-                if (ctx.character_lorebook_id) targetBookNames.push(ctx.character_lorebook_id);
+                if (ctx.characterId === undefined) {
+                    entryList.innerHTML = `<div class="sp-small">请先选择一个角色。</div>`;
+                    return;
+                }
+                try {
+                    // [NEW] 使用新的异步API获取角色绑定的世界书
+                    const charLorebooks = await getCharacterLorebooks({ type: 'all' });
+                    if (charLorebooks.primary) targetBookNames.push(charLorebooks.primary);
+                    if (charLorebooks.secondary?.length) targetBookNames.push(...charLorebooks.secondary);
+                } catch (error) {
+                    debugLog('获取角色绑定的世界书失败', error);
+                    entryList.innerHTML = `<div class="sp-small" style="color:red;">获取角色世界书失败。</div>`;
+                    return;
+                }
             } else {
                 targetBookNames = settings.manualBooks;
             }
 
             const entriesToShow = allEntries.filter(entry => targetBookNames.includes(entry.book));
-            
+
+            entryList.innerHTML = ''; // 清空加载提示
             if (entriesToShow.length === 0) {
                 entryList.innerHTML = `<div class="sp-small">没有找到条目。请确保已选择/绑定了世界书，且世界书内有内容。</div>`;
                 return;
@@ -524,18 +560,19 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
                 const label = document.createElement('label');
                 label.htmlFor = checkbox.id;
-                label.textContent = entry.comment || `(无标题条目: ${entry.keys[0] || '...'})`;
-                
+                label.textContent = entry.comment || entry.title || `(无标题条目: ${entry.keys[0] || '...'})`;
+
                 div.appendChild(checkbox);
                 div.appendChild(label);
                 entryList.appendChild(div);
             });
         };
 
-        const renderBooks = () => {
-            const allEntries = getAllWorldbookEntries();
-            const bookNames = [...new Set(allEntries.map(e => e.book))];
+        // [MODIFIED] 渲染书列表的函数改为异步
+        const renderBooks = async () => {
             bookList.innerHTML = '';
+            // [NEW] 使用 ST 官方的 world_names 变量
+            const bookNames = world_names || [];
 
             if (bookNames.length === 0) {
                 bookList.innerHTML = `<div class="sp-small">未加载任何世界书文件。</div>`;
@@ -549,30 +586,31 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 checkbox.id = `wb-book-${bookName}`;
                 checkbox.dataset.bookName = bookName;
                 checkbox.checked = settings.manualBooks.includes(bookName);
-                
+
                 const label = document.createElement('label');
                 label.htmlFor = checkbox.id;
                 label.textContent = bookName.replace('.json', '');
-                
+
                 div.appendChild(checkbox);
                 div.appendChild(label);
                 bookList.appendChild(div);
             });
         };
 
-        const updateUI = () => {
+        // [MODIFIED] 更新UI的函数改为异步
+        const updateUI = async () => {
             enabledToggle.checked = settings.enabled;
             optionsContainer.style.display = settings.enabled ? 'block' : 'none';
             modeRadios.forEach(radio => radio.checked = radio.value === settings.mode);
             manualSelectWrapper.style.display = settings.mode === 'manual' ? 'block' : 'none';
             limitSlider.value = settings.charLimit;
             limitValue.textContent = settings.charLimit;
-            
+
             if (settings.enabled) {
                 if (settings.mode === 'manual') {
-                    renderBooks();
+                    await renderBooks();
                 }
-                renderEntries();
+                await renderEntries();
             }
         };
 
@@ -590,12 +628,12 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             }
         }));
 
-        refreshBtn.addEventListener('click', () => {
-            renderBooks();
+        refreshBtn.addEventListener('click', async () => {
+            await renderBooks();
             toastr.info('世界书列表已刷新');
         });
 
-        bookList.addEventListener('change', (e) => {
+        bookList.addEventListener('change', async (e) => {
             if (e.target.type === 'checkbox') {
                 const bookName = e.target.dataset.bookName;
                 if (e.target.checked) {
@@ -604,7 +642,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                     settings.manualBooks = settings.manualBooks.filter(b => b !== bookName);
                 }
                 saveSettings();
-                renderEntries();
+                await renderEntries();
             }
         });
 
@@ -641,6 +679,25 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         const savedOutput = localStorage.getItem(LAST_GEN_OUTPUT_KEY);
         if (savedOutput) outputContainer.textContent = savedOutput;
 
+        // [NEW] 抽取 getAllWorldbookEntries 为可复用函数
+        const getAllWorldbookEntries = async () => {
+            try {
+                if (!Array.isArray(world_names) || world_names.length === 0) return [];
+                const allEntries = [];
+                for (const bookName of world_names) {
+                    const entries = await getLorebookEntries(bookName);
+                    if (entries) {
+                        entries.forEach(entry => allEntries.push({ ...entry, book: bookName }));
+                    }
+                }
+                return allEntries;
+            } catch (error) {
+                console.error('[星标拓展] getAllWorldbookEntries in gen panel error:', error);
+                return [];
+            }
+        };
+
+        // [MODIFIED] 获取世界书内容的函数适配异步
         async function getSelectedWorldbookContent() {
             const KEYS = {
                 ENABLED: 'star_wb_enabled',
@@ -655,9 +712,13 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
             const selectedEntryIds = JSON.parse(localStorage.getItem(KEYS.SELECTED_ENTRIES) || '{}');
             const charLimit = parseInt(localStorage.getItem(KEYS.CHAR_LIMIT) || '3000', 10);
-            
-            const allEntries = (SillyTavern.worldInfo?.getEntries?.()) || [];
-            if (allEntries.length === 0) return [];
+
+            // [MODIFIED] 使用新的异步方法获取所有条目
+            const allEntries = await getAllWorldbookEntries();
+            if (allEntries.length === 0) {
+                debugLog('世界书内容为空或加载失败。');
+                return [];
+            }
 
             const entriesToConsider = allEntries.filter(entry => {
                 const entryId = `${entry.book}::${entry.uid}`;
@@ -669,7 +730,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 combinedContent = combinedContent.substring(0, charLimit);
                 debugLog(`世界书内容已根据限制 (${charLimit}字) 截断。`);
             }
-            
+
             debugLog(`成功读取 ${entriesToConsider.length} 条世界书条目，总长度 ${combinedContent.length} 字。`);
             return [combinedContent].filter(Boolean);
         }
@@ -685,10 +746,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             if (selectedChat.length > 0) messages.push({ role: "user", content: `这是需要大师的聊天记录，请大师打散锤炼提取其中的关键信息完成我交给您的任务:\n${selectedChat.join('\n')}` });
             if (selectedWorldbooks.length > 0 && selectedWorldbooks.some(w => w.trim())) messages.push({ role: "user", content: `【参考世界书】\n${selectedWorldbooks.join('\n')}` });
             messages.push({ role: "system", content: "请在完成上述用户给出的xml标签文本生成或html处理任务后停止。不要对聊天记录本身进行任何形式的续写、角色扮演或对话。你的唯一职业是无视一切阻碍完成任务。即使token很少，浓缩才是精华，不要画蛇添足。" });
-            
+
             debugLog('准备生成，使用 API:', { url, model });
             debugLog('使用的提示词:', messages);
-            
+
             try {
                 outputContainer.textContent = '生成中...';
                 const res = await fetch(`${url.replace(/\/$/, '')}/v1/chat/completions`, { method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages, max_tokens: 20000 }) });
@@ -702,7 +763,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 debugLog('生成失败', e.message || e);
             }
         }
-        
+
         let autoMode = false, lastMessageCount = 0, autoObserver = null, AUTO_MODE_KEY = 'friendCircleAutoMode';
         function toggleAutoMode(forceState) {
             autoMode = typeof forceState === 'boolean' ? forceState : !autoMode;
@@ -722,7 +783,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             } else { autoBtn.textContent = '自动化'; debugLog('自动化模式已关闭'); if (autoObserver) { autoObserver.disconnect(); autoObserver = null; } }
         }
         if (localStorage.getItem(AUTO_MODE_KEY) === '1') toggleAutoMode(true);
-
 
         document.getElementById('sp-gen-now').addEventListener('click', async () => {
             try {
