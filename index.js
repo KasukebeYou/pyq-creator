@@ -416,16 +416,19 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         debugLog('进入 聊天配置面板');
     }
 
-    // ########### REPLACEMENT START: showWorldbookConfig ###########
+    // ########### REPLACEMENT START: showWorldbookConfig (FIXED) ###########
     async function showWorldbookConfig() {
         content.innerHTML = `<div class="sp-small">正在加载世界书模块...</div>`;
 
         try {
-            // [修正] 不再使用动态导入，直接使用SillyTavern的全局变量和函数
-            if (typeof window.loadWorldInfo !== 'function' || !Array.isArray(window.world_names)) {
-                throw new Error("SillyTavern核心世界书API未准备就绪。");
+            // [FIX] 延迟导入，确保ST核心脚本已准备就绪
+            const worldInfoModule = await import('../../../../scripts/world-info.js');
+            
+            // [FIX] 安全检查，确保模块和必要的函数都存在
+            if (!worldInfoModule || typeof worldInfoModule.loadWorldInfo !== 'function') {
+                throw new Error("world-info.js 模块或其API加载失败。");
             }
-
+            
             content.innerHTML = `
                 <div class="sp-section" id="worldbook-config-panel">
                     <label class="sp-switch">
@@ -496,19 +499,27 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             const renderEntries = async () => {
                 entryList.innerHTML = `<div class="sp-small">正在加载条目...</div>`;
                 let targetBookNames = [];
+                
+                // [FIX] 实时、安全地获取 getContext
+                const getContext = SillyTavern.getContext;
+                if (typeof getContext !== 'function') {
+                    entryList.innerHTML = `<div class="sp-small" style="color:red;">SillyTavern.getContext() 不可用。</div>`;
+                    return;
+                }
+                const ctx = getContext();
 
                 if (settings.mode === 'auto') {
-                    const ctx = SillyTavern.getContext();
-                    const character = ctx.characters[ctx.characterId];
-                    if (!character) {
+                    if (!ctx || !ctx.characters || !ctx.characters[ctx.characterId]) {
                         entryList.innerHTML = `<div class="sp-small">请先选择一个角色。</div>`;
                         return;
                     }
+                    const character = ctx.characters[ctx.characterId];
+                    
                     const books = new Set();
-                    // [修正] 使用正确的角色世界书数据路径
-                    if (character.data.world) books.add(character.data.world);
-                    if (Array.isArray(character.data.world_additional)) {
-                        character.data.world_additional.forEach(book => books.add(book));
+                    // [FIX] 安全地访问角色数据
+                    if (character.data?.extensions?.world) books.add(character.data.extensions.world);
+                    if (Array.isArray(character.data?.extensions?.world_additional)) {
+                        character.data.extensions.world_additional.forEach(book => books.add(book));
                     }
                     targetBookNames = Array.from(books);
                     debugLog('自动模式检测到世界书:', targetBookNames);
@@ -526,8 +537,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 const entriesToShow = [];
                 try {
                     for (const bookName of targetBookNames) {
-                        // [修正] 直接调用全局的 loadWorldInfo 函数
-                        const bookData = await window.loadWorldInfo(bookName);
+                        const bookData = await worldInfoModule.loadWorldInfo(bookName);
                         if (bookData && bookData.entries) {
                             Object.entries(bookData.entries).forEach(([uid, entry]) => {
                                 entriesToShow.push({ ...entry, uid, book: bookName });
@@ -569,8 +579,8 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
             const renderBooks = async () => {
                 bookList.innerHTML = '';
-                // [修正] 直接使用全局的 world_names 变量
-                const bookNames = window.world_names || [];
+                // [FIX] 实时获取 world_names
+                const bookNames = worldInfoModule.world_names || [];
 
                 if (bookNames.length === 0) {
                     bookList.innerHTML = `<div class="sp-small">未加载任何世界书文件。</div>`;
@@ -627,7 +637,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
             refreshBtn.addEventListener('click', async () => {
                 await renderBooks();
-                toastr.info('世界书列表已刷新');
+                if (window.toastr) toastr.info('世界书列表已刷新');
             });
 
             bookList.addEventListener('change', async (e) => {
@@ -667,17 +677,16 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             console.error('[星标拓展] Worldbook module failed to load:', err);
         }
     }
-    // ########### REPLACEMENT END: showWorldbookConfig ###########
+    // ########### REPLACEMENT END: showWorldbookConfig (FIXED) ###########
+
 
     // ########### REPLACEMENT START: showGenPanel ###########
     async function showGenPanel() {
         content.innerHTML = `<div class="sp-small">正在加载生成模块...</div>`;
 
         try {
-            // [修正] 确保我们能访问到全局的 loadWorldInfo
-            if (typeof window.loadWorldInfo !== 'function') {
-                throw new Error("SillyTavern核心世界书API未准备就绪。");
-            }
+            const worldInfoModule = await import('../../../../scripts/world-info.js');
+            const { loadWorldInfo } = worldInfoModule;
 
             content.innerHTML = `
                 <button id="sp-gen-now">立刻生成</button>
@@ -720,8 +729,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 let entriesCount = 0;
                 for (const bookName in booksToFetch) {
                     try {
-                        // [修正] 直接调用全局的 loadWorldInfo
-                        const bookData = await window.loadWorldInfo(bookName);
+                        const bookData = await loadWorldInfo(bookName);
                         if (bookData && bookData.entries) {
                             const uidsToGet = booksToFetch[bookName];
                             for (const uid of uidsToGet) {
