@@ -1,4 +1,4 @@
-// --- 星标拓展 v0.2.4 (最终修复版) ---
+// --- 星标拓展 v0.2.5 (最终稳定版) ---
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
@@ -97,7 +97,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
       panel.innerHTML = `
         <div class="sp-header">
           <div style="font-weight:600">${MODULE_NAME}</div>
-          <div style="font-size:12px; color:#999">v0.2.4</div>
+          <div style="font-size:12px; color:#999">v0.2.5</div>
         </div>
         <div class="sp-grid">
           <div class="sp-btn" data-key="api">API配置</div>
@@ -416,16 +416,13 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         debugLog('进入 聊天配置面板');
     }
 
-    // [MODIFIED] 全面重构，使用动态导入
     async function showWorldbookConfig() {
         content.innerHTML = `<div class="sp-small">正在加载世界书模块...</div>`;
 
         try {
-            // [FIXED] 使用动态导入安全地加载模块
             const worldInfoModule = await import('../../../../scripts/world-info.js');
-            const { getCharacterLorebooks, getLorebookEntries, world_names } = worldInfoModule;
+            const { getLorebookEntries, world_names } = worldInfoModule;
 
-            // 模块加载成功后，再渲染UI
             content.innerHTML = `
                 <div class="sp-section" id="worldbook-config-panel">
                     <label class="sp-switch">
@@ -493,59 +490,57 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 debugLog('世界书配置已保存', settings);
             };
 
-            const getAllWorldbookEntries = async () => {
-                try {
-                    if (!Array.isArray(world_names) || world_names.length === 0) {
-                        debugLog('警告: SillyTavern中未找到任何世界书 (world_names 为空)。');
-                        return [];
-                    }
-                    const allEntries = [];
-                    for (const bookName of world_names) {
-                        const entries = await getLorebookEntries(bookName);
-                        if (entries) {
-                            entries.forEach(entry => {
-                                allEntries.push({ ...entry, book: bookName });
-                            });
-                        }
-                    }
-                    debugLog(`成功从 ${world_names.length} 个世界书中加载了 ${allEntries.length} 个条目。`);
-                    return allEntries;
-                } catch (error) {
-                    debugLog('错误: 获取世界书条目时发生异常', error);
-                    console.error('[星标拓展] getAllWorldbookEntries error:', error);
-                    return [];
-                }
-            };
-
             const renderEntries = async () => {
                 entryList.innerHTML = `<div class="sp-small">正在加载条目...</div>`;
-                const allEntries = await getAllWorldbookEntries();
                 let targetBookNames = [];
 
                 if (settings.mode === 'auto') {
                     const ctx = getContext();
-                    if (ctx.characterId === undefined) {
+                    const character = ctx.characters[ctx.characterId];
+                    if (!character) {
                         entryList.innerHTML = `<div class="sp-small">请先选择一个角色。</div>`;
                         return;
                     }
-                    try {
-                        const charLorebooks = await getCharacterLorebooks({ type: 'all' });
-                        if (charLorebooks.primary) targetBookNames.push(charLorebooks.primary);
-                        if (charLorebooks.secondary?.length) targetBookNames.push(...charLorebooks.secondary);
-                    } catch (error) {
-                        debugLog('获取角色绑定的世界书失败', error);
-                        entryList.innerHTML = `<div class="sp-small" style="color:red;">获取角色世界书失败。</div>`;
-                        return;
+
+                    const books = new Set();
+                    if (ctx.lorebook_id) books.add(ctx.lorebook_id);
+                    if (character.lorebook) books.add(character.lorebook);
+                    if (Array.isArray(character.auxiliary_lorebooks)) {
+                        character.auxiliary_lorebooks.forEach(book => books.add(book));
                     }
+                    targetBookNames = Array.from(books);
+                    debugLog('自动模式检测到世界书:', targetBookNames);
+
                 } else {
                     targetBookNames = settings.manualBooks;
+                    debugLog('手动模式使用世界书:', targetBookNames);
                 }
 
-                const entriesToShow = allEntries.filter(entry => targetBookNames.includes(entry.book));
+                if (targetBookNames.length === 0) {
+                    entryList.innerHTML = `<div class="sp-small">未选择或绑定任何世界书。</div>`;
+                    return;
+                }
 
+                const entriesToShow = [];
+                try {
+                    for (const bookName of targetBookNames) {
+                        const entries = await getLorebookEntries(bookName);
+                        if (entries) {
+                            entries.forEach(entry => {
+                                entriesToShow.push({ ...entry, book: bookName });
+                            });
+                        }
+                    }
+                } catch (error) {
+                    debugLog('获取世界书条目时出错', error);
+                    entryList.innerHTML = `<div class="sp-small" style="color:red;">加载条目时出错。</div>`;
+                    return;
+                }
+
+                debugLog(`共找到 ${entriesToShow.length} 个待显示的条目。`);
                 entryList.innerHTML = '';
                 if (entriesToShow.length === 0) {
-                    entryList.innerHTML = `<div class="sp-small">没有找到条目。请确保已选择/绑定了世界书，且世界书内有内容。</div>`;
+                    entryList.innerHTML = `<div class="sp-small">所选世界书中没有找到条目。</div>`;
                     return;
                 }
 
@@ -669,14 +664,12 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         }
     }
 
-    // [MODIFIED] 全面重构，使用动态导入
     async function showGenPanel() {
         content.innerHTML = `<div class="sp-small">正在加载生成模块...</div>`;
 
         try {
-            // [FIXED] 使用动态导入安全地加载模块
             const worldInfoModule = await import('../../../../scripts/world-info.js');
-            const { getLorebookEntries, world_names } = worldInfoModule;
+            const { getLorebookEntries } = worldInfoModule;
 
             content.innerHTML = `
                 <button id="sp-gen-now">立刻生成</button>
@@ -690,23 +683,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             const LAST_GEN_OUTPUT_KEY = 'friendCircleLastGenOutput';
             const savedOutput = localStorage.getItem(LAST_GEN_OUTPUT_KEY);
             if (savedOutput) outputContainer.textContent = savedOutput;
-
-            const getAllWorldbookEntries = async () => {
-                try {
-                    if (!Array.isArray(world_names) || world_names.length === 0) return [];
-                    const allEntries = [];
-                    for (const bookName of world_names) {
-                        const entries = await getLorebookEntries(bookName);
-                        if (entries) {
-                            entries.forEach(entry => allEntries.push({ ...entry, book: bookName }));
-                        }
-                    }
-                    return allEntries;
-                } catch (error) {
-                    console.error('[星标拓展] getAllWorldbookEntries in gen panel error:', error);
-                    return [];
-                }
-            };
 
             async function getSelectedWorldbookContent() {
                 const KEYS = {
@@ -723,24 +699,38 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 const selectedEntryIds = JSON.parse(localStorage.getItem(KEYS.SELECTED_ENTRIES) || '{}');
                 const charLimit = parseInt(localStorage.getItem(KEYS.CHAR_LIMIT) || '3000', 10);
 
-                const allEntries = await getAllWorldbookEntries();
-                if (allEntries.length === 0) {
-                    debugLog('世界书内容为空或加载失败。');
-                    return [];
+                const booksToFetch = {};
+                for (const entryId in selectedEntryIds) {
+                    if (selectedEntryIds[entryId] === true) {
+                        const [bookName, uid] = entryId.split('::');
+                        if (!booksToFetch[bookName]) booksToFetch[bookName] = [];
+                        booksToFetch[bookName].push(uid);
+                    }
                 }
 
-                const entriesToConsider = allEntries.filter(entry => {
-                    const entryId = `${entry.book}::${entry.uid}`;
-                    return selectedEntryIds[entryId] === true;
-                });
+                let combinedContent = '';
+                let entriesCount = 0;
+                for (const bookName in booksToFetch) {
+                    try {
+                        const allEntriesInBook = await getLorebookEntries(bookName);
+                        if (allEntriesInBook) {
+                            const uidsToGet = booksToFetch[bookName];
+                            const selectedEntriesInBook = allEntriesInBook.filter(entry => uidsToGet.includes(entry.uid));
+                            combinedContent += selectedEntriesInBook.map(e => e.content).join('\n\n') + '\n\n';
+                            entriesCount += selectedEntriesInBook.length;
+                        }
+                    } catch (bookError) {
+                        debugLog(`获取世界书 ${bookName} 内容时出错:`, bookError);
+                    }
+                }
 
-                let combinedContent = entriesToConsider.map(e => e.content).join('\n\n');
+                combinedContent = combinedContent.trim();
                 if (combinedContent.length > charLimit) {
                     combinedContent = combinedContent.substring(0, charLimit);
                     debugLog(`世界书内容已根据限制 (${charLimit}字) 截断。`);
                 }
 
-                debugLog(`成功读取 ${entriesToConsider.length} 条世界书条目，总长度 ${combinedContent.length} 字。`);
+                debugLog(`成功读取 ${entriesCount} 条世界书条目，总长度 ${combinedContent.length} 字。`);
                 return [combinedContent].filter(Boolean);
             }
 
@@ -796,7 +786,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             document.getElementById('sp-gen-now').addEventListener('click', async () => {
                 try {
                     const cuttedMessages = JSON.parse(localStorage.getItem('cuttedLastMessages') || '[]');
-                    const selectedChat = cuttedMessages.length > 0 ? cuttedMessages : ['昨天和小明聊天很开心', '今天完成了一个大项目'];
+                    const selectedChat = cuttedMessages.length > 0 ? cuttedMessages : [];
                     const selectedWorldbooks = await getSelectedWorldbookContent();
                     await generateFriendCircle(selectedChat, selectedWorldbooks);
                 } catch (e) {
@@ -818,11 +808,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         }
     }
 
-      // [MODIFIED] 使按钮点击处理函数变为异步
       panel.querySelectorAll('.sp-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
           const key = btn.dataset.key;
-          content.innerHTML = `<div class="sp-small">正在加载...</div>`; // 通用加载提示
+          content.innerHTML = `<div class="sp-small">正在加载...</div>`;
           if (key === 'api') showApiConfig();
           else if (key === 'prompt') showPromptConfig();
           else if (key === 'chat') showChatConfig();
