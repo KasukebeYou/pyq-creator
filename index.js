@@ -1,17 +1,16 @@
-// --- 星标拓展 v0.2.2 (Worldbook 修复版) ---
+// --- 星标拓展 v0.2.3 (UI & Worldbook 修复版) ---
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, saveChat } from "../../../../script.js";
-// [MODIFIED] 引入新的SillyTavern世界书API
-import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../../../scripts/world-info.js";
+// [FIXED] 移除了顶部的 import 语句，以防止插件启动时崩溃
 
 (function () {
   const MODULE_NAME = '星标拓展';
 
   // 等待 ST 环境准备
   function ready(fn) {
-    if (window.SillyTavern && SillyTavern.getContext) return fn();
+    if (window.SillyTavern && SillyTavern.getContext && SillyTavern.worldInfo) return fn();
     const i = setInterval(() => {
-      if (window.SillyTavern && SillyTavern.getContext) {
+      if (window.SillyTavern && SillyTavern.getContext && SillyTavern.worldInfo) {
         clearInterval(i);
         fn();
       }
@@ -99,7 +98,7 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
       panel.innerHTML = `
         <div class="sp-header">
           <div style="font-weight:600">${MODULE_NAME}</div>
-          <div style="font-size:12px; color:#999">v0.2.2</div>
+          <div style="font-size:12px; color:#999">v0.2.3</div>
         </div>
         <div class="sp-grid">
           <div class="sp-btn" data-key="api">API配置</div>
@@ -418,7 +417,6 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
         debugLog('进入 聊天配置面板');
     }
 
-    // [MODIFIED] 整块函数替换
     function showWorldbookConfig() {
         content.innerHTML = `
             <div class="sp-section" id="worldbook-config-panel">
@@ -451,6 +449,9 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
                 </div>
             </div>
         `;
+
+        // [FIXED] 在函数内部安全地获取SillyTavern的API
+        const { getCharacterLorebooks, getLorebookEntries, world_names } = SillyTavern.worldInfo;
 
         const KEYS = {
             ENABLED: 'star_wb_enabled',
@@ -487,7 +488,6 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
             debugLog('世界书配置已保存', settings);
         };
 
-        // [NEW] 使用新的异步API获取所有世界书条目
         const getAllWorldbookEntries = async () => {
             try {
                 if (!Array.isArray(world_names) || world_names.length === 0) {
@@ -496,11 +496,9 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
                 }
                 const allEntries = [];
                 for (const bookName of world_names) {
-                    // 使用官方异步函数获取条目
                     const entries = await getLorebookEntries(bookName);
                     if (entries) {
                         entries.forEach(entry => {
-                            // 将书名附加到每个条目上，方便后续使用
                             allEntries.push({ ...entry, book: bookName });
                         });
                     }
@@ -514,7 +512,6 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
             }
         };
 
-        // [MODIFIED] 渲染条目的函数改为异步
         const renderEntries = async () => {
             entryList.innerHTML = `<div class="sp-small">正在加载条目...</div>`;
             const allEntries = await getAllWorldbookEntries();
@@ -527,7 +524,6 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
                     return;
                 }
                 try {
-                    // [NEW] 使用新的异步API获取角色绑定的世界书
                     const charLorebooks = await getCharacterLorebooks({ type: 'all' });
                     if (charLorebooks.primary) targetBookNames.push(charLorebooks.primary);
                     if (charLorebooks.secondary?.length) targetBookNames.push(...charLorebooks.secondary);
@@ -542,7 +538,7 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
 
             const entriesToShow = allEntries.filter(entry => targetBookNames.includes(entry.book));
 
-            entryList.innerHTML = ''; // 清空加载提示
+            entryList.innerHTML = '';
             if (entriesToShow.length === 0) {
                 entryList.innerHTML = `<div class="sp-small">没有找到条目。请确保已选择/绑定了世界书，且世界书内有内容。</div>`;
                 return;
@@ -568,10 +564,8 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
             });
         };
 
-        // [MODIFIED] 渲染书列表的函数改为异步
         const renderBooks = async () => {
             bookList.innerHTML = '';
-            // [NEW] 使用 ST 官方的 world_names 变量
             const bookNames = world_names || [];
 
             if (bookNames.length === 0) {
@@ -597,7 +591,6 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
             });
         };
 
-        // [MODIFIED] 更新UI的函数改为异步
         const updateUI = async () => {
             enabledToggle.checked = settings.enabled;
             optionsContainer.style.display = settings.enabled ? 'block' : 'none';
@@ -679,7 +672,9 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
         const savedOutput = localStorage.getItem(LAST_GEN_OUTPUT_KEY);
         if (savedOutput) outputContainer.textContent = savedOutput;
 
-        // [NEW] 抽取 getAllWorldbookEntries 为可复用函数
+        // [FIXED] 在函数内部安全地获取SillyTavern的API
+        const { getLorebookEntries, world_names } = SillyTavern.worldInfo;
+
         const getAllWorldbookEntries = async () => {
             try {
                 if (!Array.isArray(world_names) || world_names.length === 0) return [];
@@ -697,7 +692,6 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
             }
         };
 
-        // [MODIFIED] 获取世界书内容的函数适配异步
         async function getSelectedWorldbookContent() {
             const KEYS = {
                 ENABLED: 'star_wb_enabled',
@@ -713,7 +707,6 @@ import { getCharacterLorebooks, getLorebookEntries, world_names } from "../../..
             const selectedEntryIds = JSON.parse(localStorage.getItem(KEYS.SELECTED_ENTRIES) || '{}');
             const charLimit = parseInt(localStorage.getItem(KEYS.CHAR_LIMIT) || '3000', 10);
 
-            // [MODIFIED] 使用新的异步方法获取所有条目
             const allEntries = await getAllWorldbookEntries();
             if (allEntries.length === 0) {
                 debugLog('世界书内容为空或加载失败。');
