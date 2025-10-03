@@ -1,4 +1,5 @@
 // --- 星标拓展 v0.2.5 (最终稳定版) ---
+// --- World Book functionality updated ---
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
@@ -416,13 +417,19 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         debugLog('进入 聊天配置面板');
     }
 
+    // ########### UPDATED WORLD BOOK FUNCTION ###########
     async function showWorldbookConfig() {
         content.innerHTML = `<div class="sp-small">正在加载世界书模块...</div>`;
 
-        try {
-            const worldInfoModule = await import('../../../../scripts/world-info.js');
-            const { getLorebookEntries, world_names } = worldInfoModule;
+        // 问题1修正：直接从全局作用域获取函数和变量，不再使用 import
+        // 检查所需的核心函数和变量是否已加载
+        if (typeof getLorebookEntries === 'undefined' || typeof world_names === 'undefined') {
+            content.innerHTML = `<div class="sp-small" style="color:red;">核心世界书功能未就绪。请确保 SillyTavern 已完全加载。</div>`;
+            debugLog('世界书模块加载失败: 全局函数 getLorebookEntries 或全局变量 world_names 未找到。');
+            return;
+        }
 
+        try {
             content.innerHTML = `
                 <div class="sp-section" id="worldbook-config-panel">
                     <label class="sp-switch">
@@ -444,7 +451,11 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                             <div id="wb-book-list" class="sp-checkbox-list"></div>
                         </div>
                         <hr>
-                        <label><b>选择条目:</b></label>
+                        <label><b>选择条目:</b> (勾选需要注入的条目)</label>
+                        <div style="display:flex; gap: 8px; margin-top: 4px; margin-bottom: 8px;">
+                            <button id="wb-entry-select-all" class="sp-small-btn">全选</button>
+                            <button id="wb-entry-select-none" class="sp-small-btn">全不选</button>
+                        </div>
                         <div id="wb-entry-list" class="sp-checkbox-list"></div>
                         <hr>
                         <div>
@@ -472,6 +483,8 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
             const entryList = document.getElementById('wb-entry-list');
             const limitSlider = document.getElementById('wb-char-limit-slider');
             const limitValue = document.getElementById('wb-char-limit-value');
+            const selectAllBtn = document.getElementById('wb-entry-select-all');
+            const selectNoneBtn = document.getElementById('wb-entry-select-none');
 
             const settings = {
                 enabled: localStorage.getItem(KEYS.ENABLED) === 'true',
@@ -494,19 +507,22 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 entryList.innerHTML = `<div class="sp-small">正在加载条目...</div>`;
                 let targetBookNames = [];
 
+                // 问题2修正：使用正确的属性来获取角色世界书
                 if (settings.mode === 'auto') {
                     const ctx = getContext();
-                    const character = ctx.characters[ctx.characterId];
-                    if (!character) {
+                    if (!ctx.character) {
                         entryList.innerHTML = `<div class="sp-small">请先选择一个角色。</div>`;
                         return;
                     }
-
+                    
                     const books = new Set();
-                    if (ctx.lorebook_id) books.add(ctx.lorebook_id);
-                    if (character.lorebook) books.add(character.lorebook);
-                    if (Array.isArray(character.auxiliary_lorebooks)) {
-                        character.auxiliary_lorebooks.forEach(book => books.add(book));
+                    // 主世界书
+                    if (ctx.worldbook_file_name) {
+                        books.add(ctx.worldbook_file_name);
+                    }
+                    // 辅助世界书
+                    if (Array.isArray(ctx.character.auxiliary_lorebooks)) {
+                        ctx.character.auxiliary_lorebooks.forEach(book => books.add(book));
                     }
                     targetBookNames = Array.from(books);
                     debugLog('自动模式检测到世界书:', targetBookNames);
@@ -524,10 +540,14 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 const entriesToShow = [];
                 try {
                     for (const bookName of targetBookNames) {
+                        // 全局函数 getLorebookEntries 可以直接使用
                         const entries = await getLorebookEntries(bookName);
                         if (entries) {
                             entries.forEach(entry => {
-                                entriesToShow.push({ ...entry, book: bookName });
+                                // 确保条目有唯一的uid
+                                if (entry.uid) {
+                                    entriesToShow.push({ ...entry, book: bookName });
+                                }
                             });
                         }
                     }
@@ -549,6 +569,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                     div.title = `来自: ${entry.book}\nUID: ${entry.uid}`;
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
+                    // 使用 书名+UID 作为唯一标识符
                     const entryId = `${entry.book}::${entry.uid}`;
                     checkbox.id = `wb-entry-${entryId}`;
                     checkbox.dataset.entryId = entryId;
@@ -556,7 +577,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
                     const label = document.createElement('label');
                     label.htmlFor = checkbox.id;
-                    label.textContent = entry.comment || entry.title || `(无标题条目: ${entry.keys[0] || '...'})`;
+                    label.textContent = entry.comment || `(条目: ${entry.keys.slice(0,2).join(', ')}...)`;
 
                     div.appendChild(checkbox);
                     div.appendChild(label);
@@ -564,9 +585,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 });
             };
 
-            const renderBooks = async () => {
+            const renderBooks = () => {
                 bookList.innerHTML = '';
-                const bookNames = world_names || [];
+                // 全局变量 world_names 可以直接使用
+                const bookNames = world_names || []; 
 
                 if (bookNames.length === 0) {
                     bookList.innerHTML = `<div class="sp-small">未加载任何世界书文件。</div>`;
@@ -595,13 +617,13 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 enabledToggle.checked = settings.enabled;
                 optionsContainer.style.display = settings.enabled ? 'block' : 'none';
                 modeRadios.forEach(radio => radio.checked = radio.value === settings.mode);
-                manualSelectWrapper.style.display = settings.mode === 'manual' ? 'block' : 'none';
+                manualSelectWrapper.style.display = settings.enabled && settings.mode === 'manual' ? 'block' : 'none';
                 limitSlider.value = settings.charLimit;
                 limitValue.textContent = settings.charLimit;
 
                 if (settings.enabled) {
                     if (settings.mode === 'manual') {
-                        await renderBooks();
+                        renderBooks();
                     }
                     await renderEntries();
                 }
@@ -621,9 +643,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 }
             }));
 
-            refreshBtn.addEventListener('click', async () => {
-                await renderBooks();
-                toastr.info('世界书列表已刷新');
+            refreshBtn.addEventListener('click', () => {
+                renderBooks();
+                // SillyTavern 自带一个 toastr 通知库
+                if (window.toastr) toastr.info('世界书列表已刷新');
             });
 
             bookList.addEventListener('change', async (e) => {
@@ -644,6 +667,26 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                     settings.selectedEntries[e.target.dataset.entryId] = e.target.checked;
                     saveSettings();
                 }
+            });
+
+            selectAllBtn.addEventListener('click', () => {
+                entryList.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+                    if (!chk.checked) {
+                        chk.checked = true;
+                        settings.selectedEntries[chk.dataset.entryId] = true;
+                    }
+                });
+                saveSettings();
+            });
+
+            selectNoneBtn.addEventListener('click', () => {
+                entryList.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+                    if (chk.checked) {
+                        chk.checked = false;
+                        settings.selectedEntries[chk.dataset.entryId] = false;
+                    }
+                });
+                saveSettings();
             });
 
             limitSlider.addEventListener('input', () => {
@@ -668,8 +711,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         content.innerHTML = `<div class="sp-small">正在加载生成模块...</div>`;
 
         try {
-            const worldInfoModule = await import('../../../../scripts/world-info.js');
-            const { getLorebookEntries } = worldInfoModule;
+            // No need to import, getLorebookEntries is global
+            if (typeof getLorebookEntries === 'undefined') {
+                throw new Error("Global function getLorebookEntries is not available.");
+            }
 
             content.innerHTML = `
                 <button id="sp-gen-now">立刻生成</button>
@@ -715,7 +760,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                         const allEntriesInBook = await getLorebookEntries(bookName);
                         if (allEntriesInBook) {
                             const uidsToGet = booksToFetch[bookName];
-                            const selectedEntriesInBook = allEntriesInBook.filter(entry => uidsToGet.includes(entry.uid));
+                            const selectedEntriesInBook = allEntriesInBook.filter(entry => entry.uid && uidsToGet.includes(entry.uid));
                             combinedContent += selectedEntriesInBook.map(e => e.content).join('\n\n') + '\n\n';
                             entriesCount += selectedEntriesInBook.length;
                         }
