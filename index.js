@@ -421,9 +421,11 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         content.innerHTML = `<div class="sp-small">正在加载世界书模块...</div>`;
 
         try {
-            // ### FIX: Use absolute path for import ###
-            const worldInfoModule = await import('/scripts/world-info.js');
-            const { getLorebookEntries, world_names, getContext } = worldInfoModule;
+            // [重大修复] 移除不稳定的动态import，直接使用SillyTavern提供的全局函数和变量
+            // This is the most stable way for extensions to access core ST functionality.
+            if (typeof window.loadWorldInfo !== 'function' || typeof window.world_names === 'undefined') {
+                throw new Error("SillyTavern核心世界书函数 (loadWorldInfo, world_names) 未在全局范围内找到。");
+            }
 
             content.innerHTML = `
                 <div class="sp-section" id="worldbook-config-panel">
@@ -497,7 +499,7 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 let targetBookNames = [];
 
                 if (settings.mode === 'auto') {
-                    const ctx = getContext();
+                    const ctx = SillyTavern.getContext();
                     if (ctx.characterId === undefined || ctx.characterId < 0 || !ctx.characters[ctx.characterId]) {
                         entryList.innerHTML = `<div class="sp-small">请先选择一个角色。</div>`;
                         return;
@@ -505,8 +507,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                     const character = ctx.characters[ctx.characterId];
                     
                     const books = new Set();
-
-                    // ### START: Robust book detection logic ###
                     if (ctx.lorebook_id) books.add(ctx.lorebook_id);
                     if (character.lorebook) books.add(character.lorebook);
                     if (Array.isArray(character.auxiliary_lorebooks)) {
@@ -516,8 +516,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                     if (Array.isArray(character.data?.extensions?.world_additional)) {
                         character.data.extensions.world_additional.forEach(book => book && books.add(book));
                     }
-                    // ### END: Robust book detection logic ###
-
                     targetBookNames = Array.from(books);
                     debugLog('自动模式检测到世界书:', targetBookNames);
 
@@ -532,12 +530,12 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 }
 
                 const entriesToShow = [];
-                // ### START: Resilient book loading loop ###
                 for (const bookName of targetBookNames) {
                     if (!bookName) continue;
                     try {
                         debugLog(`正在加载世界书: ${bookName}`);
-                        const bookData = await worldInfoModule.loadWorldInfo(bookName);
+                        // [重大修复] 直接使用全局的 loadWorldInfo 函数
+                        const bookData = await window.loadWorldInfo(bookName);
                         if (bookData && bookData.entries) {
                             Object.entries(bookData.entries).forEach(([uid, entry]) => {
                                 entriesToShow.push({ ...entry, uid, book: bookName });
@@ -549,7 +547,6 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                         debugLog(`加载世界书 ${bookName} 时出错:`, error);
                     }
                 }
-                // ### END: Resilient book loading loop ###
 
                 debugLog(`共找到 ${entriesToShow.length} 个待显示的条目。`);
                 entryList.innerHTML = '';
@@ -580,7 +577,8 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
 
             const renderBooks = async () => {
                 bookList.innerHTML = '';
-                const bookNames = world_names || [];
+                // [重大修复] 直接使用全局的 world_names 变量
+                const bookNames = window.world_names || [];
 
                 if (bookNames.length === 0) {
                     bookList.innerHTML = `<div class="sp-small">未加载任何世界书文件。</div>`;
@@ -684,9 +682,10 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
         content.innerHTML = `<div class="sp-small">正在加载生成模块...</div>`;
 
         try {
-            // ### FIX: Use absolute path for import ###
-            const worldInfoModule = await import('/scripts/world-info.js');
-            const { loadWorldInfo } = worldInfoModule;
+            // [重大修复] 移除不稳定的动态import
+            if (typeof window.loadWorldInfo !== 'function') {
+                throw new Error("SillyTavern核心世界书函数 (loadWorldInfo) 未在全局范围内找到。");
+            }
 
             content.innerHTML = `
                 <button id="sp-gen-now">立刻生成</button>
@@ -729,7 +728,8 @@ import { saveSettingsDebounced, saveChat } from "../../../../script.js";
                 let entriesCount = 0;
                 for (const bookName in booksToFetch) {
                     try {
-                        const bookData = await loadWorldInfo(bookName);
+                        // [重大修复] 直接使用全局的 loadWorldInfo 函数
+                        const bookData = await window.loadWorldInfo(bookName);
                         if (bookData && bookData.entries) {
                             const uidsToGet = booksToFetch[bookName];
                             for (const uid of uidsToGet) {
